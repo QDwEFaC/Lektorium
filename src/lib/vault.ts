@@ -155,12 +155,27 @@ export async function getOverview(): Promise<Overview> {
   return { lectures, assignments, codeProjects };
 }
 
+function serializeFrontmatter(data: Record<string, unknown>) {
+  const next: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value instanceof Date) {
+      next[key] = value.toISOString().slice(0, 10);
+    } else {
+      next[key] = value;
+    }
+  }
+  return next;
+}
+
 async function writeNote(
   file: string,
   data: Record<string, unknown>,
   body: string,
 ) {
-  const serialized = matter.stringify(`${body.trim()}\n`, data);
+  const serialized = matter.stringify(
+    `${body.trim()}\n`,
+    serializeFrontmatter(data),
+  );
   await fs.writeFile(file, serialized, "utf8");
 }
 
