@@ -1,0 +1,12 @@
+[
+  {
+    "label": "Лекторий: приложение",
+    "command": "npm run dev",
+    "use_new_terminal": true
+  },
+  {
+    "label": "Задание greet",
+    "command": "python code/02-napisat-greet/main.py",
+    "use_new_terminal": true
+  }
+]

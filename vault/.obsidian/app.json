@@ -1,0 +1,12 @@
+{
+  "legacyEditor": false,
+  "livePreview": true,
+  "showFrontmatter": true,
+  "readableLineLength": true,
+  "strictLineBreaks": false,
+  "attachmentFolderPath": "Вложения",
+  "newFileLocation": "folder",
+  "newFileFolderPath": "Лекции",
+  "useMarkdownLinks": false,
+  "newLinkFormat": "shortest"
+}

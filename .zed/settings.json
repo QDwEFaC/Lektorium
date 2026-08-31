@@ -1,0 +1,24 @@
+{
+  "buffer_font_size": 14,
+  "soft_wrap": "editor_width",
+  "format_on_save": "on",
+  "file_scan_exclusions": [
+    "**/node_modules",
+    "**/.next",
+    "**/.git"
+  ],
+  "languages": {
+    "Python": {
+      "tab_size": 4
+    },
+    "TypeScript": {
+      "tab_size": 2
+    },
+    "JavaScript": {
+      "tab_size": 2
+    },
+    "Markdown": {
+      "format_on_save": "off"
+    }
+  }
+}
