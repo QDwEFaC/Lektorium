@@ -36,7 +36,7 @@ export async function urlToMarkdown(rawUrl: string): Promise<ExtractResult> {
   const response = await fetch(source, {
     headers: {
       "User-Agent":
-        "Mozilla/5.0 (compatible; Lektorium/1.0; учебный захват страниц)",
+        "Mozilla/5.0 (compatible; Lektorium/1.0; study-vault capture)",
       Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
     },
     redirect: "follow",
