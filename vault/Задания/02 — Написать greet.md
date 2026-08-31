@@ -5,7 +5,7 @@ status: todo
 lecture: 02 — Функции вход и выход
 code_path: code/02-napisat-greet
 language: python
-created: 2026-08-31T00:00:00.000Z
+created: 2026-08-31
 tags:
   - python
 ---
