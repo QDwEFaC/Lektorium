@@ -44,3 +44,29 @@ next-env.d.ts
 vault/.obsidian/workspace.json
 vault/.obsidian/workspace-mobile.json
 vault/.obsidian/graph.json.bak
+vault/.obsidian/cache/
+
+# Local notes and assignment projects (not published)
+/vault/Лекции/*
+!/vault/Лекции/.gitkeep
+!/vault/Лекции/Лекторий.md
+!/vault/Лекции/Лекторий/
+!/vault/Лекции/Лекторий/**
+/vault/Задания/*
+!/vault/Задания/.gitkeep
+!/vault/Задания/01 — Сохранить первую лекцию.md
+!/vault/Задания/02 — Написать greet.md
+!/vault/Задания/03 — Прочитать example.com.md
+/vault/Вложения/*
+!/vault/Вложения/.gitkeep
+/vault/00 Главная.md
+/vault/Карта курса.md
+/code/*
+!/code/.gitkeep
+!/code/01-sohranit-pervuyu-lekciyu/
+!/code/01-sohranit-pervuyu-lekciyu/**
+!/code/02-napisat-greet/
+!/code/02-napisat-greet/**
+!/code/03-prochitat-example-com/
+!/code/03-prochitat-example-com/**
+

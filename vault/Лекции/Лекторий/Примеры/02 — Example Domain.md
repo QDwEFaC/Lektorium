@@ -1,6 +1,8 @@
 ---
 type: lecture
 title: Example Domain
+subject: Лекторий
+module: Примеры
 source: 'https://example.com'
 captured: '2026-08-31'
 tags: []
@@ -10,6 +12,8 @@ assignments:
 # Example Domain
 
 > Источник: [Example Domain](https://example.com)
+
+Предмет: [[Лекции/Лекторий]] · Модуль: [[Лекции/Лекторий/Примеры]]
 
 ## Конспект
 

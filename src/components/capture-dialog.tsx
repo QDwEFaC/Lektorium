@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Link2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -26,34 +26,78 @@ type Extracted = {
   excerpt: string;
   source: string;
   stub: boolean;
+  suggestedSubject?: string;
 };
+
+type Taxonomy = { subject: string; modules: string[] }[];
 
 export function CaptureDialog({
   triggerLabel = "Сохранить из URL",
+  triggerVariant = "default",
+  defaultSubject = "",
+  defaultModule = "",
+  defaultMode,
 }: {
   triggerLabel?: string;
+  triggerVariant?: "default" | "outline";
+  defaultSubject?: string;
+  defaultModule?: string;
+  defaultMode?: "url" | "manual";
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<"url" | "manual">("url");
+  const [mode, setMode] = useState<"url" | "manual">(defaultMode ?? "url");
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
+  const [subject, setSubject] = useState(defaultSubject);
+  const [moduleName, setModuleName] = useState(defaultModule);
   const [markdown, setMarkdown] = useState("");
   const [source, setSource] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewed, setPreviewed] = useState(false);
+  const [stub, setStub] = useState(false);
+  const [taxonomy, setTaxonomy] = useState<Taxonomy>([]);
+
+  function applyDefaults() {
+    setSubject(defaultSubject);
+    setModuleName(defaultModule);
+    if (defaultMode) setMode(defaultMode);
+    if (defaultMode === "manual") {
+      setMarkdown((current) => current || "_Конспект пока не записан._");
+    }
+  }
 
   function reset() {
     setUrl("");
     setTitle("");
+    setSubject(defaultSubject);
+    setModuleName(defaultModule);
     setMarkdown("");
     setSource("");
     setError(null);
     setPreviewed(false);
-    setMode("url");
+    setStub(false);
+    setMode(defaultMode ?? "url");
   }
+
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/lectures")
+      .then((response) => response.json())
+      .then((data: { taxonomy?: Taxonomy }) => {
+        setTaxonomy(data.taxonomy ?? []);
+      })
+      .catch(() => {
+        setTaxonomy([]);
+      });
+  }, [open]);
+
+  const moduleOptions = useMemo(() => {
+    const match = taxonomy.find((item) => item.subject === subject);
+    return match?.modules ?? [];
+  }, [taxonomy, subject]);
 
   async function preview() {
     setLoading(true);
@@ -68,13 +112,20 @@ export function CaptureDialog({
       if (!response.ok) {
         throw new Error(data.error || "Не удалось прочитать страницу");
       }
-      setTitle(data.title);
+      if (data.suggestedSubject) {
+        setSubject(data.suggestedSubject);
+        setTitle(data.title === data.suggestedSubject ? "" : data.title);
+      } else {
+        setTitle(data.title);
+      }
       setMarkdown(data.markdown);
       setSource(data.source);
       setPreviewed(true);
+      setStub(Boolean(data.stub));
       if (data.stub) {
-        toast.message("Текст не извлечён", {
-          description: "Можно дописать конспект вручную и всё равно сохранить карточку.",
+        toast.message("Текст со страницы не прочитан", {
+          description:
+            "Укажи предмет, модуль и название урока, затем вставь конспект.",
         });
       }
     } catch (err) {
@@ -98,6 +149,8 @@ export function CaptureDialog({
         body: JSON.stringify({
           title,
           markdown,
+          subject,
+          module: moduleName,
           source: source || url || undefined,
         }),
       });
@@ -105,7 +158,7 @@ export function CaptureDialog({
       if (!response.ok) {
         throw new Error(data.error || "Не удалось сохранить");
       }
-      toast.success("Лекция сохранена в vault");
+      toast.success("Лекция сохранена в предмет и модуль");
       setOpen(false);
       reset();
       router.refresh();
@@ -119,15 +172,22 @@ export function CaptureDialog({
     }
   }
 
+  const canSave =
+    Boolean(title.trim()) &&
+    Boolean(markdown.trim()) &&
+    Boolean(subject.trim()) &&
+    Boolean(moduleName.trim());
+
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
         if (!next) reset();
+        else applyDefaults();
       }}
     >
-      <DialogTrigger render={<Button />}>
+      <DialogTrigger render={<Button variant={triggerVariant} />}>
         <Link2 data-icon="inline-start" />
         {triggerLabel}
       </DialogTrigger>
@@ -135,8 +195,8 @@ export function CaptureDialog({
         <DialogHeader>
           <DialogTitle>Сохранить материал</DialogTitle>
           <DialogDescription>
-            Страница станет markdown-заметкой в Obsidian. Потом к ней можно
-            привязать задание и папку кода для Zed.
+            Заметка попадёт в Obsidian как предмет → модуль → лекция. Потом к
+            ней можно привязать задание и папку кода для Zed.
           </DialogDescription>
         </DialogHeader>
 
@@ -179,6 +239,38 @@ export function CaptureDialog({
 
         {(previewed || mode === "manual") && (
           <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="lecture-subject">Предмет</Label>
+                <Input
+                  id="lecture-subject"
+                  list="subject-options"
+                  value={subject}
+                  onChange={(event) => setSubject(event.target.value)}
+                  placeholder="Машинное обучение"
+                />
+                <datalist id="subject-options">
+                  {taxonomy.map((item) => (
+                    <option key={item.subject} value={item.subject} />
+                  ))}
+                </datalist>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="lecture-module">Модуль</Label>
+                <Input
+                  id="lecture-module"
+                  list="module-options"
+                  value={moduleName}
+                  onChange={(event) => setModuleName(event.target.value)}
+                  placeholder="Модуль 1. Введение"
+                />
+                <datalist id="module-options">
+                  {moduleOptions.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
+              </div>
+            </div>
             <div className="space-y-1.5">
               <Label htmlFor="lecture-title">Название лекции</Label>
               <Input
@@ -201,6 +293,12 @@ export function CaptureDialog({
             )}
             <div className="space-y-1.5">
               <Label htmlFor="lecture-body">Конспект в markdown</Label>
+              {stub ? (
+                <p className="text-sm text-muted-foreground">
+                  Автоматически вытащить текст не получилось. Открой урок в
+                  браузере, скопируй конспект и вставь сюда.
+                </p>
+              ) : null}
               <Textarea
                 id="lecture-body"
                 value={markdown}
@@ -226,10 +324,7 @@ export function CaptureDialog({
           >
             Отмена
           </Button>
-          <Button
-            disabled={saving || !title.trim() || !markdown.trim()}
-            onClick={save}
-          >
+          <Button disabled={saving || !canSave} onClick={save}>
             {saving ? (
               <Loader2 className="animate-spin" data-icon="inline-start" />
             ) : null}

@@ -1,18 +1,35 @@
 import fs from "node:fs/promises";
+import type { Dirent } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
 import { createCodeProject } from "@/lib/code-project";
 import {
   ASSIGNMENTS_DIR,
   assignmentPath,
+  attachmentsDir,
   CODE_DIR,
   COURSE_MAP,
   LECTURES_DIR,
+  lectureFolderPath,
   lecturePath,
+  VAULT_ATTACHMENTS_DIR,
+  VAULT_DIR,
   wikiAssignment,
   wikiLecture,
 } from "@/lib/paths";
-import { assertSafeSlug, folderSlug, nextIndex, numberedTitle } from "@/lib/slug";
+import {
+  assertSafeRelPath,
+  assertSafeSlug,
+  folderSlug,
+  nextIndex,
+  noteFileName,
+  numberedTitle,
+} from "@/lib/slug";
+import {
+  assignmentCountLabel,
+  groupLectures,
+  type SubjectGroup,
+} from "@/lib/taxonomy";
 import type {
   Assignment,
   AssignmentStatus,
@@ -30,7 +47,12 @@ export async function ensureWorkspace() {
     ensureDir(LECTURES_DIR),
     ensureDir(ASSIGNMENTS_DIR),
     ensureDir(CODE_DIR),
+    ensureDir(VAULT_ATTACHMENTS_DIR),
   ]);
+}
+
+export async function ensureLectureAttachments(slug: string) {
+  await ensureDir(attachmentsDir(slug));
 }
 
 function excerptFrom(body: string) {
@@ -58,6 +80,25 @@ async function listMarkdown(dir: string) {
   }
 }
 
+async function listMarkdownTree(dir: string, prefix = ""): Promise<string[]> {
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const slugs: string[] = [];
+    for (const entry of entries) {
+      if (entry.name.startsWith(".")) continue;
+      const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        slugs.push(...(await listMarkdownTree(path.join(dir, entry.name), rel)));
+      } else if (entry.isFile() && entry.name.endsWith(".md")) {
+        slugs.push(rel.replace(/\.md$/, ""));
+      }
+    }
+    return slugs.sort((a, b) => a.localeCompare(b, "ru"));
+  } catch {
+    return [];
+  }
+}
+
 function replaceSection(body: string, heading: string, content: string) {
   const headingLine = `## ${heading}`;
   const start = body.indexOf(headingLine);
@@ -72,14 +113,36 @@ function replaceSection(body: string, heading: string, content: string) {
   return `${before}${headingLine}\n\n${content}\n${afterSection}`;
 }
 
+function subjectAndModule(
+  slug: string,
+  data: Record<string, unknown>,
+): { subject: string; module: string } {
+  const parts = slug.split("/");
+  return {
+    subject:
+      String(data.subject ?? "").trim() ||
+      (parts.length >= 2 ? parts[0] : "Разное"),
+    module:
+      String(data.module ?? "").trim() ||
+      (parts.length >= 3 ? parts[1] : "Общее"),
+  };
+}
+
 export async function readLecture(slug: string): Promise<Lecture> {
-  assertSafeSlug(slug);
+  assertSafeRelPath(slug);
   const raw = await fs.readFile(lecturePath(slug), "utf8");
   const parsed = matter(raw);
   const data = parsed.data as Record<string, unknown>;
+  if (String(data.type ?? "lecture") !== "lecture") {
+    throw new Error("Это не лекция");
+  }
+  await ensureLectureAttachments(slug);
+  const { subject, module } = subjectAndModule(slug, data);
   return {
     slug,
     title: String(data.title ?? slug),
+    subject,
+    module,
     source: data.source ? String(data.source) : undefined,
     captured: String(data.captured ?? ""),
     tags: stringList(data.tags),
@@ -113,8 +176,17 @@ export async function readAssignment(slug: string): Promise<Assignment> {
 
 export async function listLectures(): Promise<Lecture[]> {
   await ensureWorkspace();
-  const slugs = await listMarkdown(LECTURES_DIR);
-  return Promise.all(slugs.map((slug) => readLecture(slug)));
+  const slugs = await listMarkdownTree(LECTURES_DIR);
+  const notes = await Promise.all(
+    slugs.map(async (slug) => {
+      try {
+        return await readLecture(slug);
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return notes.filter((note): note is Lecture => note !== null);
 }
 
 export async function listAssignments(): Promise<Assignment[]> {
@@ -172,6 +244,7 @@ async function writeNote(
   data: Record<string, unknown>,
   body: string,
 ) {
+  await ensureDir(path.dirname(file));
   const serialized = matter.stringify(
     `${body.trim()}\n`,
     serializeFrontmatter(data),
@@ -179,23 +252,169 @@ async function writeNote(
   await fs.writeFile(file, serialized, "utf8");
 }
 
-export async function rebuildCourseMap() {
-  const { lectures, assignments } = await getOverview();
-  const lectureLines =
+function subjectIndexBody(subject: string, modules: string[]) {
+  const lines =
+    modules.length === 0
+      ? "_Модулей пока нет._"
+      : modules.map((name) => `- ${wikiLecture(`${subject}/${name}`)}`).join("\n");
+  return [`# ${subject}`, "", "## Модули", "", lines, ""].join("\n");
+}
+
+function moduleIndexBody(
+  subject: string,
+  moduleName: string,
+  lectures: Lecture[],
+) {
+  const lines =
     lectures.length === 0
       ? "_Лекций пока нет._"
       : lectures
-          .map((lecture) => {
-            const count = lecture.assignmentSlugs.length;
-            const suffix =
-              count === 0
-                ? "нет заданий"
-                : count === 1
-                  ? "1 задание"
-                  : `${count} задания`;
-            return `- ${wikiLecture(lecture.slug)} — ${suffix}`;
-          })
+          .map(
+            (lecture) =>
+              `- ${wikiLecture(lecture.slug)} — ${assignmentCountLabel(lecture.assignmentSlugs.length)}`,
+          )
           .join("\n");
+  return [
+    `# ${moduleName}`,
+    "",
+    `Предмет: ${wikiLecture(subject)}`,
+    "",
+    "## Лекции",
+    "",
+    lines,
+    "",
+  ].join("\n");
+}
+
+async function rewriteTaxonomyNotes(tree: SubjectGroup<Lecture>[]) {
+  for (const subject of tree) {
+    await writeNote(
+      path.join(LECTURES_DIR, `${subject.subject}.md`),
+      { type: "subject", title: subject.subject },
+      subjectIndexBody(
+        subject.subject,
+        subject.modules.map((item) => item.module),
+      ),
+    );
+    for (const mod of subject.modules) {
+      await writeNote(
+        path.join(LECTURES_DIR, subject.subject, `${mod.module}.md`),
+        {
+          type: "module",
+          title: mod.module,
+          subject: subject.subject,
+        },
+        moduleIndexBody(subject.subject, mod.module, mod.lectures),
+      );
+    }
+  }
+}
+
+export async function listTaxonomy(): Promise<SubjectGroup<Lecture>[]> {
+  const lectures = await listLectures();
+  const tree = groupLectures(lectures);
+  const bySubject = new Map(tree.map((item) => [item.subject, item]));
+
+  let entries: Dirent[] = [];
+  try {
+    entries = await fs.readdir(LECTURES_DIR, { withFileTypes: true });
+  } catch {
+    return tree;
+  }
+
+  for (const entry of entries) {
+    if (entry.name.startsWith(".")) continue;
+    if (entry.isFile() && entry.name.endsWith(".md")) {
+      const name = entry.name.replace(/\.md$/, "");
+      try {
+        const raw = await fs.readFile(path.join(LECTURES_DIR, entry.name), "utf8");
+        if (String(matter(raw).data.type ?? "") === "subject" && !bySubject.has(name)) {
+          bySubject.set(name, { subject: name, modules: [] });
+        }
+      } catch {
+        /* ignore unreadable note */
+      }
+    }
+    if (!entry.isDirectory()) continue;
+    const subject = entry.name;
+    if (!bySubject.has(subject)) {
+      bySubject.set(subject, { subject, modules: [] });
+    }
+    const group = bySubject.get(subject)!;
+    let children: Dirent[] = [];
+    try {
+      children = await fs.readdir(path.join(LECTURES_DIR, subject), {
+        withFileTypes: true,
+      });
+    } catch {
+      continue;
+    }
+    for (const child of children) {
+      if (child.name.startsWith(".")) continue;
+      let moduleName: string | null = null;
+      if (child.isDirectory()) {
+        moduleName = child.name;
+      } else if (child.isFile() && child.name.endsWith(".md")) {
+        try {
+          const raw = await fs.readFile(
+            path.join(LECTURES_DIR, subject, child.name),
+            "utf8",
+          );
+          if (String(matter(raw).data.type ?? "") === "module") {
+            moduleName = child.name.replace(/\.md$/, "");
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      if (
+        moduleName &&
+        !group.modules.some((item) => item.module === moduleName)
+      ) {
+        group.modules.push({ module: moduleName, lectures: [] });
+      }
+    }
+  }
+
+  return [...bySubject.values()]
+    .map((subject) => ({
+      ...subject,
+      modules: subject.modules.sort((left, right) =>
+        left.module.localeCompare(right.module, "ru"),
+      ),
+    }))
+    .sort((left, right) => left.subject.localeCompare(right.subject, "ru"));
+}
+
+export async function rebuildCourseMap() {
+  const { assignments } = await getOverview();
+  const tree = await listTaxonomy();
+  await rewriteTaxonomyNotes(tree);
+  const subjectSections =
+    tree.length === 0
+      ? "_Предметов пока нет._"
+      : tree
+          .map((subject) => {
+            const modules =
+              subject.modules.length === 0
+                ? "_Модулей пока нет._"
+                : subject.modules
+                    .map((mod) => {
+                      const items =
+                        mod.lectures.length === 0
+                          ? "_Лекций пока нет._"
+                          : mod.lectures
+                              .map(
+                                (lecture) =>
+                                  `- ${wikiLecture(lecture.slug)} — ${assignmentCountLabel(lecture.assignmentSlugs.length)}`,
+                              )
+                              .join("\n");
+                      return `#### ${wikiLecture(`${subject.subject}/${mod.module}`)}\n\n${items}`;
+                    })
+                    .join("\n\n");
+            return `### ${wikiLecture(subject.subject)}\n\n${modules}`;
+          })
+          .join("\n\n");
 
   const assignmentLines =
     assignments.length === 0
@@ -218,11 +437,11 @@ export async function rebuildCourseMap() {
   const body = [
     "# Карта курса",
     "",
-    "Эта заметка обновляется Лекторием. В Obsidian по ней строится граф: лекция → задание → папка кода.",
+    "Эта заметка обновляется Лекторием. В Obsidian по ней строится граф: предмет → модуль → лекция → задание.",
     "",
-    "## Лекции",
+    "## Предметы",
     "",
-    lectureLines,
+    subjectSections,
     "",
     "## Задания",
     "",
@@ -245,22 +464,26 @@ export async function rebuildCourseMap() {
   );
 }
 
-function lectureBody(
-  title: string,
-  source: string | undefined,
-  markdown: string,
-) {
-  const sourceLine = source
-    ? `> Источник: [${title}](${source})`
+function lectureBody(input: {
+  title: string;
+  subject: string;
+  module: string;
+  source?: string;
+  markdown: string;
+}) {
+  const sourceLine = input.source
+    ? `> Источник: [${input.title}](${input.source})`
     : "> Источник: конспект без ссылки";
   return [
-    `# ${title}`,
+    `# ${input.title}`,
     "",
     sourceLine,
     "",
+    `Предмет: ${wikiLecture(input.subject)} · Модуль: ${wikiLecture(`${input.subject}/${input.module}`)}`,
+    "",
     "## Конспект",
     "",
-    markdown.trim(),
+    input.markdown.trim(),
     "",
     "## Связанные задания",
     "",
@@ -279,19 +502,33 @@ function assignmentSection(assignmentSlugs: string[]) {
 export async function createLecture(input: {
   title: string;
   markdown: string;
+  subject: string;
+  module: string;
   source?: string;
   tags?: string[];
 }) {
   await ensureWorkspace();
-  const existing = await listMarkdown(LECTURES_DIR);
-  const slug = numberedTitle(nextIndex(existing), input.title);
+  const subject = noteFileName(input.subject);
+  const moduleName = noteFileName(input.module);
+  const moduleDir = path.join(LECTURES_DIR, subject, moduleName);
+  await ensureDir(moduleDir);
+  const existing = await listMarkdown(moduleDir);
+  const slug = `${subject}/${moduleName}/${numberedTitle(nextIndex(existing), input.title)}`;
   const captured = new Date().toISOString().slice(0, 10);
-  const body = lectureBody(input.title.trim(), input.source, input.markdown);
+  const body = lectureBody({
+    title: input.title.trim(),
+    subject,
+    module: moduleName,
+    source: input.source,
+    markdown: input.markdown,
+  });
   await writeNote(
     lecturePath(slug),
     {
       type: "lecture",
       title: input.title.trim(),
+      subject,
+      module: moduleName,
       source: input.source ?? "",
       captured,
       tags: input.tags ?? [],
@@ -299,6 +536,7 @@ export async function createLecture(input: {
     },
     body,
   );
+  await ensureLectureAttachments(slug);
   await rebuildCourseMap();
   return readLecture(slug);
 }
@@ -452,4 +690,250 @@ export function codeAbsPath(codePath: string) {
   const rel = codePath.replace(/^code\/?/, "");
   assertSafeSlug(rel.split("/")[0] ?? "");
   return path.join(CODE_DIR, rel);
+}
+
+async function pathExists(target: string) {
+  try {
+    await fs.access(target);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function replaceLecturePath(text: string, from: string, to: string) {
+  if (!from || from === to) return text;
+  const escaped = escapeRegExp(from);
+  return text.replace(
+    new RegExp(
+      `((?:Лекции/)|(?:vault/Лекции/))${escaped}(?=/|\\||\\]|\\.md|"|'|$)`,
+      "g",
+    ),
+    `$1${to}`,
+  );
+}
+
+function replaceBareLectureSlug(text: string, from: string, to: string) {
+  if (!from || from === to) return text;
+  const escaped = escapeRegExp(from);
+  return text
+    .replace(
+      new RegExp(`^(lecture:\\s*["']?)${escaped}(["']?\\s*)$`, "gm"),
+      `$1${to}$2`,
+    )
+    .replace(
+      new RegExp(`^(lecture:\\s*["']?)${escaped}/`, "gm"),
+      `$1${to}/`,
+    );
+}
+
+async function listVaultMarkdownFiles() {
+  const slugs = await listMarkdownTree(VAULT_DIR);
+  return slugs.map((slug) => path.join(VAULT_DIR, `${slug}.md`));
+}
+
+async function listCodeNoteFiles() {
+  try {
+    const entries = await fs.readdir(CODE_DIR, { withFileTypes: true });
+    const files: string[] = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+      for (const name of ["README.md", "ЗАДАНИЕ.md"]) {
+        const file = path.join(CODE_DIR, entry.name, name);
+        if (await pathExists(file)) files.push(file);
+      }
+    }
+    return files;
+  } catch {
+    return [];
+  }
+}
+
+async function rewritePathRefs(from: string, to: string) {
+  const files = [
+    ...(await listVaultMarkdownFiles()),
+    ...(await listCodeNoteFiles()),
+  ];
+  for (const file of files) {
+    const raw = await fs.readFile(file, "utf8");
+    const next = replaceBareLectureSlug(
+      replaceLecturePath(raw, from, to),
+      from,
+      to,
+    );
+    if (next !== raw) {
+      await fs.writeFile(file, next, "utf8");
+    }
+  }
+}
+
+async function syncLecturePlacement() {
+  const slugs = await listMarkdownTree(LECTURES_DIR);
+  for (const slug of slugs) {
+    let lecture: Lecture;
+    try {
+      lecture = await readLecture(slug);
+    } catch {
+      continue;
+    }
+    const parts = slug.split("/");
+    if (parts.length < 3) continue;
+    const [subject, moduleName] = parts;
+    if (lecture.subject === subject && lecture.module === moduleName) continue;
+    const raw = await fs.readFile(lecturePath(slug), "utf8");
+    const parsed = matter(raw);
+    let body = parsed.content;
+    body = replaceLecturePath(body, lecture.subject, subject);
+    body = replaceLecturePath(
+      body,
+      `${lecture.subject}/${lecture.module}`,
+      `${subject}/${moduleName}`,
+    );
+    await writeNote(
+      lecturePath(slug),
+      {
+        ...parsed.data,
+        subject,
+        module: moduleName,
+      },
+      body,
+    );
+  }
+}
+
+export async function createSubject(title: string) {
+  await ensureWorkspace();
+  const name = noteFileName(title);
+  const note = path.join(LECTURES_DIR, `${name}.md`);
+  const dir = path.join(LECTURES_DIR, name);
+  if ((await pathExists(note)) || (await pathExists(dir))) {
+    throw new Error("Такой предмет уже есть");
+  }
+  await writeNote(
+    note,
+    { type: "subject", title: name },
+    subjectIndexBody(name, []),
+  );
+  await ensureDir(dir);
+  await rebuildCourseMap();
+  return { subject: name };
+}
+
+export async function createModule(subjectInput: string, title: string) {
+  await ensureWorkspace();
+  const subject = noteFileName(subjectInput);
+  const moduleName = noteFileName(title);
+  const subjectDir = path.join(LECTURES_DIR, subject);
+  const subjectNote = path.join(LECTURES_DIR, `${subject}.md`);
+  if (!(await pathExists(subjectDir)) && !(await pathExists(subjectNote))) {
+    await createSubject(subject);
+  }
+  const note = path.join(subjectDir, `${moduleName}.md`);
+  const dir = path.join(subjectDir, moduleName);
+  if ((await pathExists(note)) || (await pathExists(dir))) {
+    throw new Error("Такой модуль уже есть");
+  }
+  await writeNote(
+    note,
+    { type: "module", title: moduleName, subject },
+    moduleIndexBody(subject, moduleName, []),
+  );
+  await ensureDir(dir);
+  await rebuildCourseMap();
+  return { subject, module: moduleName };
+}
+
+export async function renameSubject(from: string, toRaw: string) {
+  await ensureWorkspace();
+  const to = noteFileName(toRaw);
+  if (from === to) return { subject: to };
+  assertSafeRelPath(to);
+  const fromDir = path.join(LECTURES_DIR, from);
+  const toDir = path.join(LECTURES_DIR, to);
+  const fromNote = path.join(LECTURES_DIR, `${from}.md`);
+  const toNote = path.join(LECTURES_DIR, `${to}.md`);
+  if ((await pathExists(toDir)) || (await pathExists(toNote))) {
+    throw new Error("Предмет с таким именем уже есть");
+  }
+  if (!(await pathExists(fromDir)) && !(await pathExists(fromNote))) {
+    throw new Error("Предмет не найден");
+  }
+  if (await pathExists(fromDir)) await fs.rename(fromDir, toDir);
+  if (await pathExists(fromNote)) await fs.rename(fromNote, toNote);
+  await rewritePathRefs(from, to);
+  await syncLecturePlacement();
+  await rebuildCourseMap();
+  return { subject: to };
+}
+
+export async function renameModule(
+  subject: string,
+  from: string,
+  toRaw: string,
+) {
+  await ensureWorkspace();
+  const to = noteFileName(toRaw);
+  if (from === to) return { subject, module: to };
+  const fromDir = path.join(LECTURES_DIR, subject, from);
+  const toDir = path.join(LECTURES_DIR, subject, to);
+  const fromNote = path.join(LECTURES_DIR, subject, `${from}.md`);
+  const toNote = path.join(LECTURES_DIR, subject, `${to}.md`);
+  if ((await pathExists(toDir)) || (await pathExists(toNote))) {
+    throw new Error("Модуль с таким именем уже есть");
+  }
+  if (!(await pathExists(fromDir)) && !(await pathExists(fromNote))) {
+    throw new Error("Модуль не найден");
+  }
+  if (await pathExists(fromDir)) await fs.rename(fromDir, toDir);
+  if (await pathExists(fromNote)) await fs.rename(fromNote, toNote);
+  await rewritePathRefs(`${subject}/${from}`, `${subject}/${to}`);
+  await syncLecturePlacement();
+  await rebuildCourseMap();
+  return { subject, module: to };
+}
+
+export async function renameLecture(slug: string, titleRaw: string) {
+  await ensureWorkspace();
+  await readLecture(slug);
+  const parts = slug.split("/");
+  const currentName = parts.at(-1) ?? slug;
+  const index = currentName.match(/^(\d+)/)?.[1] ?? "01";
+  const nextName = numberedTitle(index, titleRaw);
+  const title = nextName.replace(/^\d+\s*[—-]\s*/, "");
+  const newSlug = [...parts.slice(0, -1), nextName].join("/");
+  if (newSlug !== slug) {
+    if (await pathExists(lecturePath(newSlug))) {
+      throw new Error("Лекция с таким именем уже есть");
+    }
+    const fromFolder = lectureFolderPath(slug);
+    const toFolder = lectureFolderPath(newSlug);
+    if (
+      (await pathExists(fromFolder)) &&
+      (await pathExists(toFolder))
+    ) {
+      throw new Error("Папка вложений с таким именем уже есть");
+    }
+    await fs.rename(lecturePath(slug), lecturePath(newSlug));
+    if (await pathExists(fromFolder)) {
+      await fs.rename(fromFolder, toFolder);
+    }
+    await rewritePathRefs(slug, newSlug);
+  }
+  const raw = await fs.readFile(lecturePath(newSlug), "utf8");
+  const parsed = matter(raw);
+  const body = parsed.content.replace(/^# .+$/m, `# ${title}`);
+  await writeNote(
+    lecturePath(newSlug),
+    {
+      ...parsed.data,
+      title,
+    },
+    body,
+  );
+  await rebuildCourseMap();
+  return readLecture(newSlug);
 }

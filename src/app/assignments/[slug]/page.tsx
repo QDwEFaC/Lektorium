@@ -63,13 +63,18 @@ export default async function AssignmentDetailPage({
             </CardHeader>
             <CardContent>
               {lecture ? (
-                <Button
-                  variant="outline"
-                  className="h-auto w-full justify-start whitespace-normal py-2"
-                  render={<Link href={lectureHref(lecture.slug)} />}
-                >
-                  {lecture.title}
-                </Button>
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    {lecture.subject} · {lecture.module}
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="h-auto w-full justify-start whitespace-normal py-2"
+                    render={<Link href={lectureHref(lecture.slug)} />}
+                  >
+                    {lecture.title}
+                  </Button>
+                </div>
               ) : (
                 <p className="text-sm text-muted-foreground">Не привязано</p>
               )}

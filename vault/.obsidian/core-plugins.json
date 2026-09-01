@@ -28,5 +28,7 @@
   "publish": false,
   "sync": false,
   "bases": false,
-  "webviewer": false
+  "webviewer": false,
+  "daily-notes": true,
+  "word-count": true
 }

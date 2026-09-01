@@ -1,0 +1,12 @@
+.my-green-block {
+    background-color: #80c000; /* Светло-синий фон */
+    padding: 10px 15px;        /* Отступы внутри блока */
+    border-radius: 8px;        /* Скругленные углы */
+    color: #000000;
+}
+.my-blue-block {
+    background-color: #00ffff;
+    padding: 10px 15px;
+    border-radius: 8px;
+    color: #000000;
+}

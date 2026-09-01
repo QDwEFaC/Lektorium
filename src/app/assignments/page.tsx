@@ -43,16 +43,22 @@ export default async function AssignmentsPage() {
         />
       ) : (
         <div className="grid gap-3">
-          {assignments.map((assignment) => (
+          {assignments.map((assignment) => {
+            const lecture = lectures.find(
+              (item) => item.slug === assignment.lectureSlug,
+            );
+            return (
             <Link key={assignment.slug} href={assignmentHref(assignment.slug)}>
               <Card className="hover:bg-muted/40">
                 <CardHeader className="flex-row items-start justify-between gap-3">
                   <div>
                     <CardTitle>{assignment.title}</CardTitle>
                     <CardDescription>
-                      {assignment.lectureSlug
-                        ? `Лекция: ${assignment.lectureSlug}`
-                        : "Без лекции"}
+                      {lecture
+                        ? `${lecture.subject} · ${lecture.module} · ${lecture.title}`
+                        : assignment.lectureSlug
+                          ? assignment.lectureSlug
+                          : "Без лекции"}
                     </CardDescription>
                   </div>
                   <StatusBadge status={assignment.status} />
@@ -62,7 +68,8 @@ export default async function AssignmentsPage() {
                 </CardContent>
               </Card>
             </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

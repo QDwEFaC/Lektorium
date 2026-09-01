@@ -2,7 +2,7 @@
 type: assignment
 title: Прочитать example.com
 status: todo
-lecture: 03 — Example Domain
+lecture: Лекторий/Примеры/02 — Example Domain
 code_path: code/03-prochitat-example-com
 language: python
 created: '2026-08-31'
@@ -12,7 +12,7 @@ tags: []
 
 ## Лекция
 
-[[Лекции/03 — Example Domain]]
+[[Лекции/Лекторий/Примеры/02 — Example Domain]]
 
 ## Условие
 

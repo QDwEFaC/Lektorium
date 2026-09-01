@@ -2,10 +2,10 @@
 type: assignment
 title: Написать greet
 status: todo
-lecture: 02 — Функции вход и выход
+lecture: Лекторий/Примеры/01 — Функции вход и выход
 code_path: code/02-napisat-greet
 language: python
-created: 2026-08-31
+created: '2026-08-31'
 tags:
   - python
 ---
@@ -13,7 +13,7 @@ tags:
 
 ## Лекция
 
-[[Лекции/02 — Функции вход и выход]]
+[[Лекции/Лекторий/Примеры/01 — Функции вход и выход]]
 
 ## Условие
 

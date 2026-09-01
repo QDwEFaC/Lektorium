@@ -2,7 +2,7 @@
 
 Эта папка — место для кода в **Zed**. Заметки живут в Obsidian.
 
-- Лекция: `vault/Лекции/03 — Example Domain.md`
+- Лекция: `vault/Лекции/Лекторий/Примеры/02 — Example Domain.md`
 - Задание: `vault/Задания/03 — Прочитать example.com.md`
 - Язык: python
 

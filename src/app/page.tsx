@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, BookOpen, Code2, ListChecks } from "lucide-react";
 import { AssignmentDialog } from "@/components/assignment-dialog";
 import { CaptureDialog } from "@/components/capture-dialog";
+import { CreateTaxonomyDialog } from "@/components/create-taxonomy-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import {
@@ -13,14 +14,21 @@ import {
 } from "@/components/ui/card";
 import { assignmentHref, lectureHref } from "@/lib/links";
 import { STATUS_LABEL } from "@/lib/types";
-import { getOverview } from "@/lib/vault";
+import { getOverview, listTaxonomy } from "@/lib/vault";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const { lectures, assignments, codeProjects } = await getOverview();
+  const [{ lectures, assignments, codeProjects }, tree] = await Promise.all([
+    getOverview(),
+    listTaxonomy(),
+  ]);
   const openAssignments = assignments.filter((item) => item.status !== "done");
   const done = assignments.filter((item) => item.status === "done").length;
+  const moduleCount = tree.reduce(
+    (sum, subject) => sum + subject.modules.length,
+    0,
+  );
 
   return (
     <div className="space-y-8">
@@ -30,21 +38,21 @@ export default async function HomePage() {
           Лекция из интернета становится заметкой, заданием и папкой кода.
         </h1>
         <p className="max-w-2xl text-muted-foreground">
-          Сохрани URL в markdown для Obsidian. К каждой лекции привяжи задание —
-          Лекторий проставит wiki-ссылки и заведёт каталог, который открывается в
-          Zed.
+          Сохрани URL в markdown для Obsidian: предмет → модуль → лекция. К
+          уроку привяжи задание — появятся wiki-ссылки и каталог для Zed.
         </p>
         <div className="flex flex-wrap gap-2">
           <CaptureDialog />
+          <CreateTaxonomyDialog kind="subject" />
           <AssignmentDialog lectures={lectures} />
         </div>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-3">
         <Stat
-          label="Лекции"
-          value={lectures.length}
-          hint="markdown в vault/Лекции"
+          label="Предметы"
+          value={tree.length}
+          hint={`${moduleCount} модулей · ${lectures.length} лекций`}
         />
         <Stat
           label="Задания в работе"
@@ -108,7 +116,8 @@ export default async function HomePage() {
                     <p className="font-medium">{assignment.title}</p>
                     <p className="text-xs text-muted-foreground">
                       {assignment.lectureSlug
-                        ? `Лекция: ${assignment.lectureSlug}`
+                        ? lectures.find((item) => item.slug === assignment.lectureSlug)
+                          ?.title ?? assignment.lectureSlug
                         : "Без лекции"}{" "}
                       · {assignment.codePath}
                     </p>
@@ -123,42 +132,50 @@ export default async function HomePage() {
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="font-heading text-lg font-semibold">Последние лекции</h2>
+          <h2 className="font-heading text-lg font-semibold">Предметы</h2>
           <Link
             href="/lectures"
             className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
           >
-            Все лекции <ArrowRight className="size-3.5" />
+            Все предметы <ArrowRight className="size-3.5" />
           </Link>
         </div>
-        {lectures.length === 0 ? (
+        {tree.length === 0 ? (
           <EmptyState
-            title="Лекций ещё нет"
-            description="Вставь ссылку на материал курса — получится заметка с источником и местом для заданий."
-            action={<CaptureDialog />}
+            title="Предметов ещё нет"
+            description="Создай предмет или вставь ссылку на материал курса."
+            action={<CreateTaxonomyDialog kind="subject" triggerVariant="default" />}
           />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            {lectures.slice(-4).reverse().map((lecture) => (
-              <Link key={lecture.slug} href={lectureHref(lecture.slug)}>
-                <Card className="h-full hover:bg-muted/40">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <BookOpen className="size-4 text-muted-foreground" />
-                      {lecture.title}
-                    </CardTitle>
-                    <CardDescription>{lecture.excerpt}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex gap-3 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1">
-                      <ListChecks className="size-3.5" />
-                      {lecture.assignmentSlugs.length} зад.
-                    </span>
-                    {lecture.source ? <span>есть источник</span> : null}
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+            {tree.map((subject) => {
+              const lectureCount = subject.modules.reduce(
+                (sum, mod) => sum + mod.lectures.length,
+                0,
+              );
+              return (
+                <Link key={subject.subject} href={lectureHref(subject.subject)}>
+                  <Card className="h-full hover:bg-muted/40">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <BookOpen className="size-4 text-muted-foreground" />
+                        {subject.subject}
+                      </CardTitle>
+                      <CardDescription>
+                        {subject.modules.map((mod) => mod.module).join(" · ")}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex gap-3 text-xs text-muted-foreground">
+                      <span>{subject.modules.length} модул.</span>
+                      <span className="inline-flex items-center gap-1">
+                        <ListChecks className="size-3.5" />
+                        {lectureCount} лекц.
+                      </span>
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
           </div>
         )}
       </section>

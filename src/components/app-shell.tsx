@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/", label: "Курс", icon: Home },
-  { href: "/lectures", label: "Лекции", icon: BookOpen },
+  { href: "/lectures", label: "Предметы", icon: BookOpen },
   { href: "/assignments", label: "Задания", icon: ListChecks },
   { href: "/code", label: "Код", icon: Code2 },
 ];
@@ -62,7 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             Лекторий
           </p>
           <p className="text-xs text-muted-foreground">
-            Лекции → задания → код
+            Предмет → модуль → лекция
           </p>
         </div>
         <CaptureDialog />
@@ -93,7 +93,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Sheet>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6">
+        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
           {children}
         </main>
       </div>

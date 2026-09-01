@@ -8,6 +8,20 @@
   "collapse-color-groups": false,
   "colorGroups": [
     {
+      "query": "type:subject",
+      "color": {
+        "a": 1,
+        "rgb": 4283782485
+      }
+    },
+    {
+      "query": "type:module",
+      "color": {
+        "a": 1,
+        "rgb": 4288708085
+      }
+    },
+    {
       "query": "type:lecture",
       "color": {
         "a": 1,

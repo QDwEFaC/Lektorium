@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { assignmentHref } from "@/lib/links";
+import { groupLectures } from "@/lib/taxonomy";
 import type { CodeLanguage } from "@/lib/types";
 
 const LANGUAGES: { value: CodeLanguage; label: string }[] = [
@@ -31,7 +32,7 @@ export function AssignmentDialog({
   defaultLectureSlug,
   triggerLabel = "Новое задание",
 }: {
-  lectures: { slug: string; title: string }[];
+  lectures: { slug: string; title: string; subject: string; module: string }[];
   defaultLectureSlug?: string;
   triggerLabel?: string;
 }) {
@@ -126,11 +127,20 @@ export function AssignmentDialog({
               className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
             >
               <option value="">Без лекции</option>
-              {lectures.map((lecture) => (
-                <option key={lecture.slug} value={lecture.slug}>
-                  {lecture.title}
-                </option>
-              ))}
+              {groupLectures(lectures).map((subject) =>
+                subject.modules.map((mod) => (
+                  <optgroup
+                    key={`${subject.subject}/${mod.module}`}
+                    label={`${subject.subject} · ${mod.module}`}
+                  >
+                    {mod.lectures.map((lecture) => (
+                      <option key={lecture.slug} value={lecture.slug}>
+                        {lecture.title}
+                      </option>
+                    ))}
+                  </optgroup>
+                )),
+              )}
             </select>
           </div>
           <div className="space-y-1.5">

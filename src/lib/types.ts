@@ -4,6 +4,8 @@ export type CodeLanguage = "python" | "typescript" | "javascript";
 export type Lecture = {
   slug: string;
   title: string;
+  subject: string;
+  module: string;
   source?: string;
   captured: string;
   tags: string[];

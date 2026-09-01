@@ -3,6 +3,7 @@
 Учебный vault: URL → markdown в `vault/` (Obsidian), задания со wiki-ссылками, код в `code/` (Zed).
 
 - Заметки пишутся на диск, базы нет.
+- Структура: предмет → модуль → лекция в `vault/Лекции/`.
 - `src/lib/vault.ts` — чтение и запись vault.
 - `src/lib/extract.ts` — захват страницы в markdown.
 

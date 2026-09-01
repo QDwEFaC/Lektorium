@@ -1,0 +1,24 @@
+# Скопируй в ~/.config/systemd/user/lektorium.service
+# и поправь WorkingDirectory, если репозиторий лежит не здесь.
+# Затем: systemctl --user daemon-reload && systemctl --user enable --now lektorium
+
+[Unit]
+Description=Лекторий — учебный vault на :4521
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/code/lector/zed-obsidian
+Environment=NODE_ENV=production
+Environment=PORT=4521
+# Production build, если ещё не собирали.
+ExecStartPre=/bin/bash -c 'test -f .next/BUILD_ID || /usr/bin/npm run build'
+ExecStart=/usr/bin/npm run start
+Restart=on-failure
+RestartSec=3
+TimeoutStartSec=10min
+KillMode=control-group
+
+[Install]
+WantedBy=default.target

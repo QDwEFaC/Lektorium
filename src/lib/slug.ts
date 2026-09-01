@@ -46,6 +46,19 @@ export function assertSafeSlug(slug: string) {
   }
 }
 
+export function assertSafeRelPath(rel: string) {
+  if (!rel || rel.includes("\0") || rel.includes("\\")) {
+    throw new Error("Некорректное имя файла");
+  }
+  const parts = rel.split("/");
+  if (
+    parts.length === 0 ||
+    parts.some((part) => !part || part === "." || part === "..")
+  ) {
+    throw new Error("Некорректное имя файла");
+  }
+}
+
 export function noteFileName(title: string) {
   const cleaned = title
     .trim()
