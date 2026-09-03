@@ -37,6 +37,7 @@ export async function MarkdownView({
         "[&_h3]:mt-4 [&_h3]:scroll-mt-20 [&_h3]:font-medium",
         "[&_h4]:mt-3 [&_h4]:scroll-mt-20 [&_h4]:font-medium",
         "[&_h5]:scroll-mt-20 [&_h6]:scroll-mt-20",
+        "[&_:is(h1,h2,h3,h4,h5,h6)_.katex]:font-normal [&_:is(h1,h2,h3,h4,h5,h6)_.katex-html]:overflow-visible",
         "[&_p]:text-pretty",
         "[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4",
         "[&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5",

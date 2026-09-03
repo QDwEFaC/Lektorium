@@ -13,6 +13,16 @@ function nodeHref(node: OutlineNode) {
   return node.href ?? `#${node.id}`;
 }
 
+function OutlineLabel({ node }: { node: OutlineNode }) {
+  if (!node.html) return node.text;
+  return (
+    <span
+      className="[&_.katex]:text-[1em] [&_.katex]:leading-none [&_.katex]:font-normal"
+      dangerouslySetInnerHTML={{ __html: node.html }}
+    />
+  );
+}
+
 function OutlineLinks({
   nodes,
   active,
@@ -33,12 +43,12 @@ function OutlineLinks({
         return (
           <li key={node.id}>
             {href.startsWith("#") ? (
-              <a href={href} className={className}>
-                {node.text}
+              <a href={href} className={className} title={node.text}>
+                <OutlineLabel node={node} />
               </a>
             ) : (
-              <Link href={href} className={className}>
-                {node.text}
+              <Link href={href} className={className} title={node.text}>
+                <OutlineLabel node={node} />
               </Link>
             )}
             {node.children.length > 0 ? (

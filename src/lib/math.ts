@@ -1,3 +1,5 @@
+import katex from "katex";
+
 /** A line that is only `$$`, optionally inside a blockquote. */
 const DISPLAY_FENCE = /^[ \t]*(?:>[ \t]*)*\$\$[ \t]*$/;
 /** `$$` on its own line, with at least one blockquote marker. */
@@ -73,4 +75,81 @@ export function normalizeQuotedDisplayMath(markdown: string) {
   }
 
   return out.join("\n");
+}
+
+const INLINE_MATH = /\$\$([^$]+)\$\$|\$([^$\n]+)\$/g;
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function decodeHtml(value: string) {
+  return value
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#(\d+);/g, (_m, code) => String.fromCharCode(Number(code)))
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"');
+}
+
+function renderInlineKatex(latex: string) {
+  try {
+    return katex.renderToString(latex, {
+      throwOnError: false,
+      displayMode: false,
+      strict: "ignore",
+      output: "html",
+    });
+  } catch {
+    return escapeHtml(latex);
+  }
+}
+
+function katexToPlain(latex: string) {
+  return decodeHtml(renderInlineKatex(latex).replace(/<[^>]+>/g, "")).trim();
+}
+
+function stripMarkdown(raw: string) {
+  return raw
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/!\[\[([^\]|#]+)(?:\|([^\]]+))?\]\]/g, (_m, target, alias) =>
+      String(alias || String(target).split("/").pop() || target),
+    )
+    .replace(/\[\[([^\]|#]+)(?:\|([^\]]+))?\]\]/g, (_m, target, alias) =>
+      String(alias || String(target).split("/").pop() || target),
+    )
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/!!(?:\{[^}]+\})?(.+?)!!/g, "$1")
+    .replace(/\+\+(.+?)\+\+/g, "$1")
+    .replace(/\|\|(.+?)\|\|/g, "$1")
+    .replace(/[*_~]+/g, "")
+    .replace(/\\([\\`*_{}[\]()#+.!-])/g, "$1")
+    .trim();
+}
+
+/** Plain text + KaTeX HTML for a heading that may contain `$...$`. */
+export function formatHeadingWithMath(raw: string) {
+  const slots: string[] = [];
+  const tokenized = raw.replace(INLINE_MATH, (_match, display: string, inline: string) => {
+    slots.push((display ?? inline).trim());
+    return `\0MATH${slots.length - 1}\0`;
+  });
+  const cleaned = stripMarkdown(tokenized);
+  const html = escapeHtml(cleaned).replace(/\0MATH(\d+)\0/g, (_match, index: string) =>
+    renderInlineKatex(slots[Number(index)] ?? ""),
+  );
+  const text = cleaned
+    .replace(/\0MATH(\d+)\0/g, (_match, index: string) =>
+      katexToPlain(slots[Number(index)] ?? ""),
+    )
+    .trim();
+  return {
+    text: text || "Без названия",
+    html: html || escapeHtml(text || "Без названия"),
+  };
 }

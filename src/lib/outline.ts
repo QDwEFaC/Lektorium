@@ -1,9 +1,11 @@
 import { visit } from "unist-util-visit";
 import { lectureHref } from "@/lib/links";
+import { formatHeadingWithMath } from "@/lib/math";
 
 export type OutlineNode = {
   id: string;
   text: string;
+  html?: string;
   depth: number;
   href?: string;
   children: OutlineNode[];
@@ -17,45 +19,29 @@ type MdNode = {
   data?: { hProperties?: Record<string, unknown> };
 };
 
-function cleanHeading(raw: string) {
-  return raw
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/!\[\[([^\]|#]+)(?:\|([^\]]+))?\]\]/g, (_m, target, alias) =>
-      String(alias || String(target).split("/").pop() || target),
-    )
-    .replace(/\[\[([^\]|#]+)(?:\|([^\]]+))?\]\]/g, (_m, target, alias) =>
-      String(alias || String(target).split("/").pop() || target),
-    )
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/!!(?:\{[^}]+\})?(.+?)!!/g, "$1")
-    .replace(/\+\+(.+?)\+\+/g, "$1")
-    .replace(/\|\|(.+?)\|\|/g, "$1")
-    .replace(/[*_~]+/g, "")
-    .replace(/\\([\\`*_{}[\]()#+.!-])/g, "$1")
-    .trim();
-}
-
 function stripFences(markdown: string) {
   return markdown.replace(/^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1\s*$/gm, "");
 }
 
 export function collectHeadings(markdown: string) {
-  const items: { id: string; level: number; text: string }[] = [];
+  const items: { id: string; level: number; text: string; html: string }[] = [];
   let index = 0;
   for (const line of stripFences(markdown).split("\n")) {
     const match = line.match(/^(#{1,6})\s+(.+?)\s*$/);
     if (!match) continue;
+    const heading = formatHeadingWithMath(match[2]);
     items.push({
       id: `h-${index++}`,
       level: match[1].length,
-      text: cleanHeading(match[2]) || "Без названия",
+      text: heading.text,
+      html: heading.html,
     });
   }
   return items;
 }
 
 function nest(
-  items: { id: string; level: number; text: string }[],
+  items: { id: string; level: number; text: string; html?: string }[],
 ): OutlineNode[] {
   if (items.length === 0) return [];
   const base = Math.min(...items.map((item) => item.level));
@@ -65,6 +51,7 @@ function nest(
     const node: OutlineNode = {
       id: item.id,
       text: item.text,
+      html: item.html,
       depth: item.level - base,
       children: [],
     };
