@@ -8,7 +8,11 @@
 
 def greet(name: str) -> str:
     # Напиши решение здесь
-    raise NotImplementedError
+    if name == "":
+        return "Hi, Mr.Incognito!"
+    else:
+        return "Hi, " + name
+    # raise NotImplementedError
 
 
 def solve() -> None:

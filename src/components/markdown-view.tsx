@@ -7,6 +7,7 @@ import {
   remarkExtendedMarkdown,
 } from "@/lib/extended-markdown";
 import { wikiToMarkdown } from "@/lib/links";
+import { normalizeQuotedDisplayMath } from "@/lib/math";
 import { loadEnabledSnippetCss, scopeCss } from "@/lib/note-css";
 import { remarkHeadingIds } from "@/lib/outline";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ export async function MarkdownView({
   className?: string;
 }) {
   const { markdown: withoutStyle, css: noteCss } = extractNoteStyles(markdown);
+  const withMath = normalizeQuotedDisplayMath(withoutStyle);
   const snippetCss = await loadEnabledSnippetCss();
   const css = scopeCss([snippetCss, noteCss].filter(Boolean).join("\n"), NOTE_SCOPE);
 
@@ -61,7 +63,7 @@ export async function MarkdownView({
         ]}
         rehypePlugins={[[rehypeKatex, { strict: "ignore" }]]}
       >
-        {wikiToMarkdown(withoutStyle, { lectureSlug })}
+        {wikiToMarkdown(withMath, { lectureSlug })}
       </Markdown>
     </div>
   );
