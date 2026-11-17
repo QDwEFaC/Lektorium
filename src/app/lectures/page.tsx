@@ -1,7 +1,7 @@
 import { CaptureDialog } from "@/components/capture-dialog";
 import { CreateTaxonomyDialog } from "@/components/create-taxonomy-dialog";
 import { EmptyState } from "@/components/empty-state";
-import { SubjectTree } from "@/components/subject-tree";
+import { SubjectBoard } from "@/components/subject-board";
 import { listTaxonomy } from "@/lib/vault";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +37,7 @@ export default async function LecturesPage() {
           action={<CreateTaxonomyDialog kind="subject" triggerVariant="default" />}
         />
       ) : (
-        <SubjectTree tree={tree} />
+        <SubjectBoard tree={tree} afterDeleteHref="/lectures" />
       )}
     </div>
   );

@@ -1,7 +1,7 @@
 ---
 type: assignment
 title: Написать greet
-status: todo
+status: done
 lecture: Лекторий/Примеры/01 — Функции вход и выход
 code_path: code/02-napisat-greet
 language: python
@@ -31,4 +31,4 @@ tags:
 
 ## Статус
 
-не начато
+сдано

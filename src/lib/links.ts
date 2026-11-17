@@ -10,6 +10,8 @@ export type WikiToMarkdownOptions = {
   lectureSlug?: string;
 };
 
+import { ATTACHMENTS_FOLDER } from "@/lib/paths";
+
 export function wikiToMarkdown(
   markdown: string,
   options: WikiToMarkdownOptions = {},
@@ -58,18 +60,23 @@ function rewriteMarkdownImages(markdown: string, lectureSlug?: string) {
 function resolveEmbedSrc(target: string, lectureSlug?: string) {
   const trimmed = target.trim().replaceAll("\\", "/").replace(/^\.\//, "");
   if (isRemoteOrMediaUrl(trimmed)) return trimmed;
-  if (trimmed.startsWith("Лекции/") || trimmed.startsWith("Вложения/")) {
-    return mediaHref(trimmed);
+  if (trimmed.startsWith("Лекции/")) return mediaHref(trimmed);
+
+  const name = fileName(trimmed);
+  const fromAttachmentsFolder =
+    trimmed === ATTACHMENTS_FOLDER ||
+    trimmed.startsWith(`${ATTACHMENTS_FOLDER}/`);
+
+  if (lectureSlug && (fromAttachmentsFolder || !trimmed.includes("/"))) {
+    return mediaHref(`Лекции/${lectureSlug}/${ATTACHMENTS_FOLDER}/${name}`);
   }
-  if (lectureSlug) {
-    if (trimmed.includes("/")) {
-      const parent = lectureSlug.split("/").slice(0, -1).join("/");
-      const rel = parent ? `Лекции/${parent}/${trimmed}` : `Лекции/${trimmed}`;
-      return mediaHref(rel);
-    }
-    return mediaHref(`Лекции/${lectureSlug}/Вложения/${trimmed}`);
+  if (lectureSlug && trimmed.includes("/")) {
+    const parent = lectureSlug.split("/").slice(0, -1).join("/");
+    const rel = parent ? `Лекции/${parent}/${trimmed}` : `Лекции/${trimmed}`;
+    return mediaHref(rel);
   }
-  return mediaHref(`Вложения/${fileName(trimmed)}`);
+  if (fromAttachmentsFolder) return mediaHref(trimmed);
+  return mediaHref(`${ATTACHMENTS_FOLDER}/${name}`);
 }
 
 function mediaHref(vaultRel: string) {

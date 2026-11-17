@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { assignmentHref } from "@/lib/links";
+import { CODE_LANGUAGE_LABEL } from "@/lib/types";
 import { listCodeProjects, listLectures } from "@/lib/vault";
 
 export const dynamic = "force-dynamic";
@@ -67,7 +68,7 @@ export default async function CodePage() {
                 ) : null}
                 {project.language ? (
                   <p className="text-xs text-muted-foreground">
-                    {project.language}
+                    {CODE_LANGUAGE_LABEL[project.language]}
                   </p>
                 ) : null}
               </CardContent>

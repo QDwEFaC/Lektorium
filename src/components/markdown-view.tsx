@@ -1,4 +1,5 @@
 import Markdown from "react-markdown";
+import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -43,10 +44,14 @@ export async function MarkdownView({
         "[&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5",
         "[&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-5",
         "[&_blockquote]:border-l-2 [&_blockquote]:border-primary/30 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground",
-        "[&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-3",
+        "[&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-border [&_pre]:bg-muted [&_pre]:p-3",
         "[&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.85em]",
-        "[&_pre_code]:bg-transparent [&_pre_code]:p-0",
+        "[&_pre_code]:block [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-[13px] [&_pre_code]:leading-relaxed",
         "[&_img]:max-w-full [&_img]:rounded-lg",
+        "[&_table]:my-3 [&_table]:w-full [&_table]:border-collapse [&_table]:text-[0.95em]",
+        "[&_th]:border [&_th]:border-border [&_th]:bg-muted/50 [&_th]:px-2.5 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-medium",
+        "[&_td]:border [&_td]:border-border [&_td]:px-2.5 [&_td]:py-1.5",
+        "[&_tr:nth-child(even)]:bg-muted/25",
         "[&_.katex]:text-[1.05em] [&_.katex]:text-foreground",
         "[&_.katex-display]:my-4 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:py-1",
         "[&_ins]:underline",
@@ -62,7 +67,17 @@ export async function MarkdownView({
           remarkExtendedMarkdown,
           remarkHeadingIds,
         ]}
-        rehypePlugins={[[rehypeKatex, { strict: "ignore" }]]}
+        rehypePlugins={[
+          [rehypeHighlight, { ignoreMissing: true }],
+          [rehypeKatex, { strict: "ignore" }],
+        ]}
+        components={{
+          table: ({ children }) => (
+            <div className="overflow-x-auto">
+              <table>{children}</table>
+            </div>
+          ),
+        }}
       >
         {wikiToMarkdown(withMath, { lectureSlug })}
       </Markdown>

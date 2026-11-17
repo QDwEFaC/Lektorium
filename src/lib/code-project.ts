@@ -56,6 +56,30 @@ export function solve() {
 solve();
 `,
   }),
+  rust: (title) => ({
+    file: "main.rs",
+    contents: `//! Задание: ${title}
+//!
+//! Открой связанную заметку в Obsidian (папка vault/Задания).
+
+fn solve() {
+    todo!("Напиши решение здесь");
+}
+
+fn main() {
+    solve();
+}
+`,
+  }),
+  markdown: (title) => ({
+    file: "notes.md",
+    contents: `# ${title}
+
+Открой связанную заметку в Obsidian (папка vault/Задания).
+
+Напиши решение здесь.
+`,
+  }),
 };
 
 export async function createCodeProject(input: {

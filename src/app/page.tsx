@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { ArrowRight, BookOpen, Code2, ListChecks } from "lucide-react";
+import { ArrowRight, Code2 } from "lucide-react";
 import { AssignmentDialog } from "@/components/assignment-dialog";
 import { CaptureDialog } from "@/components/capture-dialog";
 import { CreateTaxonomyDialog } from "@/components/create-taxonomy-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
+import { SubjectBoard } from "@/components/subject-board";
 import {
   Card,
   CardContent,
@@ -12,7 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { assignmentHref, lectureHref } from "@/lib/links";
+import { assignmentHref } from "@/lib/links";
 import { STATUS_LABEL } from "@/lib/types";
 import { getOverview, listTaxonomy } from "@/lib/vault";
 
@@ -147,36 +148,7 @@ export default async function HomePage() {
             action={<CreateTaxonomyDialog kind="subject" triggerVariant="default" />}
           />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {tree.map((subject) => {
-              const lectureCount = subject.modules.reduce(
-                (sum, mod) => sum + mod.lectures.length,
-                0,
-              );
-              return (
-                <Link key={subject.subject} href={lectureHref(subject.subject)}>
-                  <Card className="h-full hover:bg-muted/40">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <BookOpen className="size-4 text-muted-foreground" />
-                        {subject.subject}
-                      </CardTitle>
-                      <CardDescription>
-                        {subject.modules.map((mod) => mod.module).join(" · ")}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex gap-3 text-xs text-muted-foreground">
-                      <span>{subject.modules.length} модул.</span>
-                      <span className="inline-flex items-center gap-1">
-                        <ListChecks className="size-3.5" />
-                        {lectureCount} лекц.
-                      </span>
-                    </CardContent>
-                  </Card>
-                </Link>
-              );
-            })}
-          </div>
+          <SubjectBoard tree={tree} />
         )}
       </section>
 

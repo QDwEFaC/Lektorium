@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { lectureHref } from "@/lib/links";
+import { CODE_LANGUAGE_LABEL } from "@/lib/types";
 import { getAssignmentOrNull, getLectureOrNull } from "@/lib/vault";
 
 export const dynamic = "force-dynamic";
@@ -91,7 +92,7 @@ export default async function AssignmentDetailPage({
             <CardContent className="space-y-2">
               <CopyPath value={assignment.codePath} />
               <p className="text-xs text-muted-foreground">
-                Язык: {assignment.language}
+                Язык: {CODE_LANGUAGE_LABEL[assignment.language]}
               </p>
             </CardContent>
           </Card>

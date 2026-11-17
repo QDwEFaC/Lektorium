@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { assignmentHref } from "@/lib/links";
+import { CODE_LANGUAGE_LABEL } from "@/lib/types";
 import { listAssignments, listLectures } from "@/lib/vault";
 
 export const dynamic = "force-dynamic";
@@ -64,7 +65,7 @@ export default async function AssignmentsPage() {
                   <StatusBadge status={assignment.status} />
                 </CardHeader>
                 <CardContent className="text-xs text-muted-foreground">
-                  {assignment.codePath} · {assignment.language}
+                  {assignment.codePath} · {CODE_LANGUAGE_LABEL[assignment.language]}
                 </CardContent>
               </Card>
             </Link>

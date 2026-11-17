@@ -2,7 +2,7 @@
   "legacyEditor": false,
   "livePreview": true,
   "showFrontmatter": true,
-  "readableLineLength": true,
+  "readableLineLength": false,
   "strictLineBreaks": false,
   "attachmentFolderPath": "Вложения",
   "newFileLocation": "folder",

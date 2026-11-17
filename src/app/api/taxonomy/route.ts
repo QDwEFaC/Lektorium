@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { createModule, createSubject, renameModule, renameSubject } from "@/lib/vault";
+import {
+  createModule,
+  createSubject,
+  deleteSubject,
+  renameModule,
+  renameSubject,
+} from "@/lib/vault";
 
 export async function POST(request: Request) {
   try {
@@ -57,6 +63,23 @@ export async function PATCH(request: Request) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Не удалось переименовать";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const body = (await request.json()) as {
+      type?: string;
+      subject?: string;
+    };
+    if (body.type !== "subject" || !body.subject?.trim()) {
+      return NextResponse.json({ error: "Нужен предмет" }, { status: 400 });
+    }
+    return NextResponse.json(await deleteSubject(body.subject));
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Не удалось удалить предмет";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

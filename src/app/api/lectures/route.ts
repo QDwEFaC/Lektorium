@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { createLecture, listLectures, listTaxonomy, renameLecture } from "@/lib/vault";
+import {
+  createLecture,
+  listLectures,
+  listTaxonomy,
+  relocalizeLectureImages,
+  renameLecture,
+} from "@/lib/vault";
 
 export async function GET() {
   const [lectures, tree] = await Promise.all([listLectures(), listTaxonomy()]);
@@ -20,6 +26,7 @@ export async function POST(request: Request) {
       source?: string;
       subject?: string;
       module?: string;
+      captureId?: string;
     };
     if (!body.title?.trim() || !body.markdown?.trim()) {
       return NextResponse.json(
@@ -39,6 +46,7 @@ export async function POST(request: Request) {
       subject: body.subject,
       module: body.module,
       source: body.source?.trim() || undefined,
+      captureId: body.captureId?.trim() || undefined,
     });
     return NextResponse.json(lecture);
   } catch (error) {
@@ -50,7 +58,15 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const body = (await request.json()) as { slug?: string; title?: string };
+    const body = (await request.json()) as {
+      slug?: string;
+      title?: string;
+      relocalizeImages?: boolean;
+    };
+    if (body.relocalizeImages && body.slug?.trim()) {
+      const result = await relocalizeLectureImages(body.slug.trim());
+      return NextResponse.json(result);
+    }
     if (!body.slug?.trim() || !body.title?.trim()) {
       return NextResponse.json(
         { error: "Нужны текущий путь лекции и новое название" },

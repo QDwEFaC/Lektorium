@@ -46,6 +46,9 @@ vault/.obsidian/workspace-mobile.json
 vault/.obsidian/graph.json.bak
 vault/.obsidian/cache/
 
+# Local page-to-markdown parsers (not part of the product)
+/src/lib/page-parse/impl.local/
+
 # Local notes and assignment projects (not published)
 /vault/Лекции/*
 !/vault/Лекции/.gitkeep

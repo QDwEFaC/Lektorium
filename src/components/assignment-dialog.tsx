@@ -19,13 +19,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { assignmentHref } from "@/lib/links";
 import { groupLectures } from "@/lib/taxonomy";
-import type { CodeLanguage } from "@/lib/types";
-
-const LANGUAGES: { value: CodeLanguage; label: string }[] = [
-  { value: "python", label: "Python" },
-  { value: "typescript", label: "TypeScript" },
-  { value: "javascript", label: "JavaScript" },
-];
+import {
+  CODE_LANGUAGES,
+  CODE_LANGUAGE_LABEL,
+  type CodeLanguage,
+} from "@/lib/types";
 
 export function AssignmentDialog({
   lectures,
@@ -153,9 +151,9 @@ export function AssignmentDialog({
               }
               className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
             >
-              {LANGUAGES.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
+              {CODE_LANGUAGES.map((item) => (
+                <option key={item} value={item}>
+                  {CODE_LANGUAGE_LABEL[item]}
                 </option>
               ))}
             </select>

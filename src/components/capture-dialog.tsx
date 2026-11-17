@@ -26,8 +26,14 @@ type Extracted = {
   excerpt: string;
   source: string;
   stub: boolean;
-  suggestedSubject?: string;
+  captureId?: string;
+  images?: string[];
+  error?: string;
 };
+
+const NEW_VALUE = "__new__";
+const selectClass =
+  "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm";
 
 type Taxonomy = { subject: string; modules: string[] }[];
 
@@ -42,11 +48,14 @@ export function CaptureDialog({
   triggerVariant?: "default" | "outline";
   defaultSubject?: string;
   defaultModule?: string;
-  defaultMode?: "url" | "manual";
+  defaultMode?: "url" | "manual" | "html";
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<"url" | "manual">(defaultMode ?? "url");
+  const [mode, setMode] = useState<"url" | "manual" | "html">(
+    defaultMode ?? "url",
+  );
+  const [htmlFiles, setHtmlFiles] = useState<File[]>([]);
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState(defaultSubject);
@@ -58,6 +67,7 @@ export function CaptureDialog({
   const [error, setError] = useState<string | null>(null);
   const [previewed, setPreviewed] = useState(false);
   const [stub, setStub] = useState(false);
+  const [captureId, setCaptureId] = useState<string | undefined>();
   const [taxonomy, setTaxonomy] = useState<Taxonomy>([]);
 
   function applyDefaults() {
@@ -76,9 +86,11 @@ export function CaptureDialog({
     setModuleName(defaultModule);
     setMarkdown("");
     setSource("");
+    setHtmlFiles([]);
     setError(null);
     setPreviewed(false);
     setStub(false);
+    setCaptureId(undefined);
     setMode(defaultMode ?? "url");
   }
 
@@ -112,27 +124,97 @@ export function CaptureDialog({
       if (!response.ok) {
         throw new Error(data.error || "Не удалось прочитать страницу");
       }
-      if (data.suggestedSubject) {
-        setSubject(data.suggestedSubject);
-        setTitle(data.title === data.suggestedSubject ? "" : data.title);
-      } else {
-        setTitle(data.title);
-      }
+      if (data.title) setTitle(data.title);
       setMarkdown(data.markdown);
       setSource(data.source);
       setPreviewed(true);
       setStub(Boolean(data.stub));
+      setCaptureId(data.captureId);
+      if (data.error) setError(data.error);
       if (data.stub) {
         toast.message("Текст со страницы не прочитан", {
           description:
-            "Укажи предмет, модуль и название урока, затем вставь конспект.",
+            data.error ||
+            "Вставь конспект вручную или подключи локальный модуль разбора.",
         });
+      } else if (data.images?.length) {
+        toast.success(`Скачано картинок: ${data.images.length}`);
       }
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : "Страница недоступна. Вставь текст вручную.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function applyExtracted(data: Extracted) {
+    if (data.title) setTitle(data.title);
+    setMarkdown(data.markdown);
+    setSource(data.source || source || url);
+    setPreviewed(true);
+    setStub(Boolean(data.stub));
+    setCaptureId(data.captureId);
+    if (data.error) setError(data.error);
+    if (data.stub) {
+      toast.message("Конспект из HTML не собран", {
+        description:
+          data.error ||
+          "Модуль разбора не собрал текст. Вставь конспект вручную.",
+      });
+    } else if (data.images?.length) {
+      toast.success(`Скачано картинок: ${data.images.length}`);
+    }
+  }
+
+  function isCaptureFile(file: File) {
+    const name = file.webkitRelativePath || file.name;
+    return (
+      /\.html?$|\.xhtml$/i.test(name) ||
+      /html/i.test(file.type) ||
+      /\.(png|jpe?g|gif|webp|svg)$/i.test(name) ||
+      /^image\//i.test(file.type)
+    );
+  }
+
+  async function previewHtml() {
+    setLoading(true);
+    setError(null);
+    try {
+      const selected = htmlFiles.filter(isCaptureFile);
+      const hasHtml = selected.some((file) => {
+        const name = file.webkitRelativePath || file.name;
+        return /\.html?$|\.xhtml$/i.test(name) || /html/i.test(file.type);
+      });
+      if (!hasHtml) {
+        throw new Error("Выбери .html сохранённой страницы");
+      }
+      const form = new FormData();
+      if (url.trim()) form.append("source", url.trim());
+      form.append(
+        "paths",
+        JSON.stringify(
+          selected.map((file) => file.webkitRelativePath || file.name),
+        ),
+      );
+      for (const file of selected) {
+        form.append("files", file, file.webkitRelativePath || file.name);
+      }
+      const response = await fetch("/api/capture", {
+        method: "POST",
+        body: form,
+      });
+      const data = (await response.json()) as Extracted & { error?: string };
+      if (!response.ok) {
+        throw new Error(data.error || "Не удалось разобрать HTML");
+      }
+      applyExtracted(data);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Не удалось разобрать HTML",
       );
     } finally {
       setLoading(false);
@@ -152,6 +234,7 @@ export function CaptureDialog({
           subject,
           module: moduleName,
           source: source || url || undefined,
+          captureId,
         }),
       });
       const data = (await response.json()) as { slug?: string; error?: string };
@@ -201,11 +284,16 @@ export function CaptureDialog({
         </DialogHeader>
 
         <Tabs value={mode} onValueChange={(value) => setMode(value as typeof mode)}>
-          <TabsList>
+          <TabsList className="h-auto min-h-8 w-full flex-wrap">
             <TabsTrigger value="url">Из URL</TabsTrigger>
+            <TabsTrigger value="html">HTML целиком</TabsTrigger>
             <TabsTrigger value="manual">Вставить текст</TabsTrigger>
           </TabsList>
           <TabsContent value="url" className="space-y-3 pt-3">
+            <p className="text-sm text-muted-foreground">
+              Если подключён локальный модуль разбора страниц, по ссылке
+              соберётся черновик. Иначе вставь текст на вкладке «Вставить текст».
+            </p>
             <div className="space-y-1.5">
               <Label htmlFor="source-url">Ссылка на лекцию или статью</Label>
               <div className="flex flex-col gap-2 sm:flex-row">
@@ -229,6 +317,62 @@ export function CaptureDialog({
               </div>
             </div>
           </TabsContent>
+          <TabsContent value="html" className="space-y-3 pt-3">
+            <p className="text-sm text-muted-foreground">
+              Сюда можно передать сохранённый HTML (и папку с картинками),
+              если твой модуль разбора это умеет. Без модуля вкладка ничего
+              не соберёт — используй «Вставить текст».
+            </p>
+            <div className="space-y-1.5">
+              <Label htmlFor="saved-html">HTML и картинки</Label>
+              <Input
+                id="saved-html"
+                type="file"
+                multiple
+                accept=".html,.htm,.xhtml,.png,.jpg,.jpeg,.gif,.webp,.svg,text/html,image/*"
+                onChange={(event) =>
+                  setHtmlFiles(Array.from(event.target.files ?? []))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="saved-folder">Или папка сохранённой страницы</Label>
+              <Input
+                id="saved-folder"
+                type="file"
+                multiple
+                {...{ webkitdirectory: "", directory: "" }}
+                onChange={(event) =>
+                  setHtmlFiles(Array.from(event.target.files ?? []))
+                }
+              />
+            </div>
+            {htmlFiles.length > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Выбрано файлов: {htmlFiles.length}
+              </p>
+            ) : null}
+            <div className="space-y-1.5">
+              <Label htmlFor="html-source">Ссылка-источник (необязательно)</Label>
+              <Input
+                id="html-source"
+                placeholder="https://..."
+                value={url}
+                onChange={(event) => setUrl(event.target.value)}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={loading || htmlFiles.length === 0}
+              onClick={previewHtml}
+            >
+              {loading ? (
+                <Loader2 className="animate-spin" data-icon="inline-start" />
+              ) : null}
+              Разобрать HTML
+            </Button>
+          </TabsContent>
           <TabsContent value="manual" className="space-y-3 pt-3">
             <p className="text-sm text-muted-foreground">
               Если страница не открывается (видео, PDF, закрытый курс) — вставь
@@ -242,33 +386,86 @@ export function CaptureDialog({
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="lecture-subject">Предмет</Label>
-                <Input
+                <select
                   id="lecture-subject"
-                  list="subject-options"
-                  value={subject}
-                  onChange={(event) => setSubject(event.target.value)}
-                  placeholder="Машинное обучение"
-                />
-                <datalist id="subject-options">
+                  className={selectClass}
+                  value={
+                    taxonomy.some((item) => item.subject === subject)
+                      ? subject
+                      : subject.trim()
+                        ? NEW_VALUE
+                        : ""
+                  }
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (value === NEW_VALUE) {
+                      setSubject("");
+                      setModuleName("");
+                      return;
+                    }
+                    setSubject(value);
+                    const mods =
+                      taxonomy.find((item) => item.subject === value)?.modules ??
+                      [];
+                    setModuleName(mods.includes(moduleName) ? moduleName : "");
+                  }}
+                >
+                  <option value="" disabled>
+                    Выбери предмет
+                  </option>
                   {taxonomy.map((item) => (
-                    <option key={item.subject} value={item.subject} />
+                    <option key={item.subject} value={item.subject}>
+                      {item.subject}
+                    </option>
                   ))}
-                </datalist>
+                  <option value={NEW_VALUE}>Новый предмет…</option>
+                </select>
+                {!taxonomy.some((item) => item.subject === subject) ? (
+                  <Input
+                    value={subject}
+                    onChange={(event) => setSubject(event.target.value)}
+                    placeholder="Название нового предмета"
+                  />
+                ) : null}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="lecture-module">Модуль</Label>
-                <Input
+                <select
                   id="lecture-module"
-                  list="module-options"
-                  value={moduleName}
-                  onChange={(event) => setModuleName(event.target.value)}
-                  placeholder="Модуль 1. Введение"
-                />
-                <datalist id="module-options">
+                  className={selectClass}
+                  value={
+                    moduleOptions.includes(moduleName)
+                      ? moduleName
+                      : moduleName.trim()
+                        ? NEW_VALUE
+                        : ""
+                  }
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (value === NEW_VALUE) {
+                      setModuleName("");
+                      return;
+                    }
+                    setModuleName(value);
+                  }}
+                >
+                  <option value="" disabled>
+                    Выбери модуль
+                  </option>
                   {moduleOptions.map((name) => (
-                    <option key={name} value={name} />
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
                   ))}
-                </datalist>
+                  <option value={NEW_VALUE}>Новый модуль…</option>
+                </select>
+                {!moduleOptions.includes(moduleName) ? (
+                  <Input
+                    value={moduleName}
+                    onChange={(event) => setModuleName(event.target.value)}
+                    placeholder="Название нового модуля"
+                  />
+                ) : null}
               </div>
             </div>
             <div className="space-y-1.5">
@@ -280,7 +477,7 @@ export function CaptureDialog({
                 placeholder="Как устроены функции"
               />
             </div>
-            {mode === "manual" && (
+            {(mode === "manual" || (mode === "html" && previewed)) && (
               <div className="space-y-1.5">
                 <Label htmlFor="manual-source">Источник (необязательно)</Label>
                 <Input

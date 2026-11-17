@@ -2,6 +2,14 @@ import fs from "node:fs/promises";
 import type { Dirent } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import {
+  importCaptureImages,
+  stageCaptureImages,
+} from "@/lib/capture-staging";
+import {
+  fetchAuthorizedImages,
+  wikiEmbedsFromImages,
+} from "@/lib/page-parse";
 import { createCodeProject } from "@/lib/code-project";
 import {
   ASSIGNMENTS_DIR,
@@ -30,12 +38,13 @@ import {
   groupLectures,
   type SubjectGroup,
 } from "@/lib/taxonomy";
-import type {
-  Assignment,
-  AssignmentStatus,
-  CodeLanguage,
-  Lecture,
-  Overview,
+import {
+  isCodeLanguage,
+  type Assignment,
+  type AssignmentStatus,
+  type CodeLanguage,
+  type Lecture,
+  type Overview,
 } from "@/lib/types";
 
 async function ensureDir(dir: string) {
@@ -158,16 +167,14 @@ export async function readAssignment(slug: string): Promise<Assignment> {
   const parsed = matter(raw);
   const data = parsed.data as Record<string, unknown>;
   const status = String(data.status ?? "todo") as AssignmentStatus;
-  const language = String(data.language ?? "python") as CodeLanguage;
+  const language = String(data.language ?? "python");
   return {
     slug,
     title: String(data.title ?? slug),
     status: ["todo", "in-progress", "done"].includes(status) ? status : "todo",
     lectureSlug: data.lecture ? String(data.lecture) : undefined,
     codePath: String(data.code_path ?? ""),
-    language: ["python", "typescript", "javascript"].includes(language)
-      ? language
-      : "python",
+    language: isCodeLanguage(language) ? language : "python",
     created: String(data.created ?? ""),
     tags: stringList(data.tags),
     body: parsed.content,
@@ -506,6 +513,7 @@ export async function createLecture(input: {
   module: string;
   source?: string;
   tags?: string[];
+  captureId?: string;
 }) {
   await ensureWorkspace();
   const subject = noteFileName(input.subject);
@@ -537,8 +545,67 @@ export async function createLecture(input: {
     body,
   );
   await ensureLectureAttachments(slug);
+  if (input.captureId) {
+    const copied = await importCaptureImages(slug, input.captureId);
+    if (copied.length) {
+      const raw = await fs.readFile(lecturePath(slug), "utf8");
+      const parsed = matter(raw);
+      const next = wikiEmbedsFromImages(parsed.content, copied);
+      await writeNote(
+        lecturePath(slug),
+        parsed.data as Record<string, unknown>,
+        next,
+      );
+    }
+  }
   await rebuildCourseMap();
   return readLecture(slug);
+}
+
+export async function relocalizeLectureImages(slug: string) {
+  const lecture = await readLecture(slug);
+  const urls = [
+    ...lecture.body.matchAll(/!\[[^\]]*\]\(\s*(https?:[^)\s]+)\s*\)/g),
+  ].map((match) => match[1]);
+  if (urls.length === 0) return { slug, images: 0 };
+  const files = await fetchAuthorizedImages(urls, lecture.source);
+  if (files.length === 0) return { slug, images: 0 };
+  const staged = await stageCaptureImages(files);
+  const copied = await importCaptureImages(slug, staged.captureId);
+  const raw = await fs.readFile(lecturePath(slug), "utf8");
+  const parsed = matter(raw);
+  const aliases = new Map<string, string>();
+  for (const url of urls) {
+    const name = copied.find((item) => {
+      const base = item.replace(/^\d+-/, "");
+      return url.includes(base) || url.includes(encodeURIComponent(base));
+    });
+    if (name) aliases.set(url, name);
+  }
+  const next = wikiEmbedsFromImages(parsed.content, copied, aliases);
+  await writeNote(
+    lecturePath(slug),
+    parsed.data as Record<string, unknown>,
+    next,
+  );
+  return { slug, images: copied.length };
+}
+
+async function unlinkAssignmentLecture(assignment: Assignment) {
+  const raw = await fs.readFile(assignmentPath(assignment.slug), "utf8");
+  const parsed = matter(raw);
+  await writeNote(
+    assignmentPath(assignment.slug),
+    {
+      ...parsed.data,
+      lecture: "",
+    },
+    replaceSection(
+      parsed.content,
+      "Лекция",
+      "_Задание пока не привязано к лекции._",
+    ),
+  );
 }
 
 async function rewriteLectureAssignments(
@@ -845,6 +912,43 @@ export async function createModule(subjectInput: string, title: string) {
   await ensureDir(dir);
   await rebuildCourseMap();
   return { subject, module: moduleName };
+}
+
+export async function deleteSubject(subjectRaw: string) {
+  await ensureWorkspace();
+  const subject = subjectRaw.trim();
+  assertSafeSlug(subject);
+  const dir = path.join(LECTURES_DIR, subject);
+  const note = path.join(LECTURES_DIR, `${subject}.md`);
+  if (!(await pathExists(dir)) && !(await pathExists(note))) {
+    throw new Error("Предмет не найден");
+  }
+
+  const lectures = (await listLectures()).filter(
+    (item) => item.subject === subject || item.slug.startsWith(`${subject}/`),
+  );
+  const lectureSlugs = new Set(lectures.map((item) => item.slug));
+  const assignments = await listAssignments();
+  for (const assignment of assignments) {
+    const linked = assignment.lectureSlug?.trim();
+    if (
+      linked &&
+      (lectureSlugs.has(linked) ||
+        linked === subject ||
+        linked.startsWith(`${subject}/`))
+    ) {
+      await unlinkAssignmentLecture(assignment);
+    }
+  }
+
+  if (await pathExists(dir)) {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+  if (await pathExists(note)) {
+    await fs.unlink(note);
+  }
+  await rebuildCourseMap();
+  return { subject };
 }
 
 export async function renameSubject(from: string, toRaw: string) {

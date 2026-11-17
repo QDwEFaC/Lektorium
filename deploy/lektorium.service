@@ -12,6 +12,8 @@ Type=simple
 WorkingDirectory=%h/code/lector/zed-obsidian
 Environment=NODE_ENV=production
 Environment=PORT=4521
+# Окно браузера для входа в закрытый курс (скачивание HTML целиком).
+Environment=DISPLAY=:0
 # Production build, если ещё не собирали.
 ExecStartPre=/bin/bash -c 'test -f .next/BUILD_ID || /usr/bin/npm run build'
 ExecStart=/usr/bin/npm run start

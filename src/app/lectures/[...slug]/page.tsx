@@ -6,6 +6,7 @@ import { CreateTaxonomyDialog } from "@/components/create-taxonomy-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { LectureOutline } from "@/components/lecture-outline";
 import { MarkdownView } from "@/components/markdown-view";
+import { DeleteSubjectDialog } from "@/components/delete-subject-dialog";
 import { RenameDialog } from "@/components/rename-dialog";
 import { StatusBadge } from "@/components/status-badge";
 import { SubjectTree } from "@/components/subject-tree";
@@ -72,6 +73,11 @@ export default async function LectureCatchAllPage({
           </div>
           <div className="flex flex-wrap gap-2">
             <RenameDialog kind="subject" current={subject.subject} />
+            <DeleteSubjectDialog
+              subject={subject.subject}
+              moduleCount={subject.modules.length}
+              lectureCount={subjectLectures.length}
+            />
             <CreateTaxonomyDialog kind="module" subject={subject.subject} />
           </div>
         </div>

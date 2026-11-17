@@ -5,7 +5,7 @@
 - Заметки пишутся на диск, базы нет.
 - Структура: предмет → модуль → лекция в `vault/Лекции/`.
 - `src/lib/vault.ts` — чтение и запись vault.
-- `src/lib/extract.ts` — захват страницы в markdown.
+- `src/lib/page-parse/` — контракт разбора страницы в markdown; реализация только локально в `impl.local/` (gitignore).
 
 <!-- BEGIN:nextjs-agent-rules -->
 

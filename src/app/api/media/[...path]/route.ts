@@ -50,8 +50,9 @@ async function resolveMediaFile(rel: string): Promise<string | null> {
   const normalized = rel.replaceAll("\\", "/");
   const candidates = [normalized];
   const base = normalized.split("/").filter(Boolean).at(-1);
-  if (base && !normalized.startsWith(`${ATTACHMENTS_FOLDER}/`)) {
-    candidates.push(`${ATTACHMENTS_FOLDER}/${base}`);
+  if (base) {
+    const vaultRoot = `${ATTACHMENTS_FOLDER}/${base}`;
+    if (!candidates.includes(vaultRoot)) candidates.push(vaultRoot);
   }
   for (const candidate of candidates) {
     try {

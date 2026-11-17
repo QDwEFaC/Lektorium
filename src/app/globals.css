@@ -136,6 +136,64 @@
   background-color: color-mix(in oklch, var(--primary) 22%, transparent);
 }
 
+.lektorium-md .hljs-comment,
+.lektorium-md .hljs-quote {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+.lektorium-md .hljs-keyword,
+.lektorium-md .hljs-selector-tag,
+.lektorium-md .hljs-literal,
+.lektorium-md .hljs-section,
+.lektorium-md .hljs-link {
+  color: color-mix(in oklab, var(--primary) 70%, #7c3aed);
+  font-weight: 600;
+}
+
+.lektorium-md .hljs-string,
+.lektorium-md .hljs-attr,
+.lektorium-md .hljs-symbol,
+.lektorium-md .hljs-bullet,
+.lektorium-md .hljs-addition {
+  color: color-mix(in oklab, var(--foreground) 25%, #2f9e6a);
+}
+
+.lektorium-md .hljs-number,
+.lektorium-md .hljs-meta,
+.lektorium-md .hljs-built_in {
+  color: color-mix(in oklab, var(--foreground) 20%, #d97706);
+}
+
+.lektorium-md .hljs-title,
+.lektorium-md .hljs-title.function_,
+.lektorium-md .hljs-name {
+  color: color-mix(in oklab, var(--primary) 65%, #2563eb);
+}
+
+.lektorium-md .hljs-title.class_,
+.lektorium-md .hljs-type {
+  color: color-mix(in oklab, var(--foreground) 30%, #ca8a04);
+}
+
+.lektorium-md .hljs-variable,
+.lektorium-md .hljs-template-variable,
+.lektorium-md .hljs-params {
+  color: var(--foreground);
+}
+
+.lektorium-md .hljs-deletion {
+  color: var(--destructive);
+}
+
+.lektorium-md .hljs-emphasis {
+  font-style: italic;
+}
+
+.lektorium-md .hljs-strong {
+  font-weight: 600;
+}
+
 .lektorium-md span.spoiler {
   border-radius: 2px;
   color: transparent;

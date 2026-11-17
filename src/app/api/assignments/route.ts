@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
+import { isCodeLanguage } from "@/lib/types";
 import { createAssignment } from "@/lib/vault";
-import type { CodeLanguage } from "@/lib/types";
-
-const LANGUAGES: CodeLanguage[] = ["python", "typescript", "javascript"];
 
 export async function POST(request: Request) {
   try {
@@ -18,9 +16,8 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    const language = LANGUAGES.includes(body.language as CodeLanguage)
-      ? (body.language as CodeLanguage)
-      : "python";
+    const rawLanguage = body.language ?? "";
+    const language = isCodeLanguage(rawLanguage) ? rawLanguage : "python";
     const result = await createAssignment({
       title: body.title,
       prompt: body.prompt,

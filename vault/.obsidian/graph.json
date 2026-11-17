@@ -11,35 +11,35 @@
       "query": "type:subject",
       "color": {
         "a": 1,
-        "rgb": 4283782485
+        "rgb": 16733525
       }
     },
     {
       "query": "type:module",
       "color": {
         "a": 1,
-        "rgb": 4288708085
+        "rgb": 16752765
       }
     },
     {
       "query": "type:lecture",
       "color": {
         "a": 1,
-        "rgb": 4280149653
+        "rgb": 16719334
       }
     },
     {
       "query": "type:assignment",
       "color": {
         "a": 1,
-        "rgb": 4293212469
+        "rgb": 16770361
       }
     },
     {
       "query": "type:map",
       "color": {
         "a": 1,
-        "rgb": 4285887861
+        "rgb": 16741749
       }
     }
   ],
@@ -48,5 +48,11 @@
   "textFadeMultiplier": 0,
   "nodeSizeMultiplier": 1,
   "lineSizeMultiplier": 1,
-  "scale": 1
+  "collapse-forces": true,
+  "centerStrength": 0.518713248970312,
+  "repelStrength": 10,
+  "linkStrength": 1,
+  "linkDistance": 250,
+  "scale": 0.552224393623021,
+  "close": false
 }

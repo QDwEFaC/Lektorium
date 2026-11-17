@@ -1,7 +1,7 @@
 ---
 type: assignment
 title: Прочитать example.com
-status: todo
+status: done
 lecture: Лекторий/Примеры/02 — Example Domain
 code_path: code/03-prochitat-example-com
 language: python
@@ -26,4 +26,4 @@ tags: []
 
 ## Статус
 
-не начато
+сдано

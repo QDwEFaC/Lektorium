@@ -1,5 +1,24 @@
 export type AssignmentStatus = "todo" | "in-progress" | "done";
-export type CodeLanguage = "python" | "typescript" | "javascript";
+export const CODE_LANGUAGES = [
+  "python",
+  "typescript",
+  "javascript",
+  "rust",
+  "markdown",
+] as const;
+export type CodeLanguage = (typeof CODE_LANGUAGES)[number];
+
+export const CODE_LANGUAGE_LABEL: Record<CodeLanguage, string> = {
+  python: "Python",
+  typescript: "TypeScript",
+  javascript: "JavaScript",
+  rust: "Rust",
+  markdown: "Markdown",
+};
+
+export function isCodeLanguage(value: string): value is CodeLanguage {
+  return (CODE_LANGUAGES as readonly string[]).includes(value);
+}
 
 export type Lecture = {
   slug: string;

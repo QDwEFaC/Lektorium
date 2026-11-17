@@ -6,7 +6,8 @@
     "dev": "next dev --hostname 0.0.0.0 --port 4521",
     "build": "next build",
     "start": "next start --hostname 0.0.0.0 --port 4521",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "node scripts/ensure-page-parse.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -19,9 +20,11 @@
     "lucide-react": "^1.38.0",
     "next": "16.3.3",
     "next-themes": "^0.4.6",
+    "playwright-core": "^1.65.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
