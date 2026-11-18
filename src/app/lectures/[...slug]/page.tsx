@@ -6,6 +6,7 @@ import { CreateTaxonomyDialog } from "@/components/create-taxonomy-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { LectureOutline } from "@/components/lecture-outline";
 import { MarkdownView } from "@/components/markdown-view";
+import { DeleteLectureDialog } from "@/components/delete-lecture-dialog";
 import { DeleteSubjectDialog } from "@/components/delete-subject-dialog";
 import { RenameDialog } from "@/components/rename-dialog";
 import { StatusBadge } from "@/components/status-badge";
@@ -232,6 +233,13 @@ export default async function LectureCatchAllPage({
             kind="lecture"
             current={lecture.title}
             slug={lecture.slug}
+          />
+          <DeleteLectureDialog
+            slug={lecture.slug}
+            title={lecture.title}
+            subject={lecture.subject}
+            module={lecture.module}
+            assignmentCount={lecture.assignmentSlugs.length}
           />
           <AssignmentDialog
             lectures={lectures}

@@ -1000,6 +1000,33 @@ export async function renameModule(
   return { subject, module: to };
 }
 
+export async function deleteLecture(slugRaw: string) {
+  await ensureWorkspace();
+  const slug = slugRaw.trim();
+  assertSafeRelPath(slug);
+  const lecture = await readLecture(slug);
+  const assignments = await listAssignments();
+  for (const assignment of assignments) {
+    if (assignment.lectureSlug === lecture.slug) {
+      await unlinkAssignmentLecture(assignment);
+    }
+  }
+  const note = lecturePath(slug);
+  const folder = lectureFolderPath(slug);
+  if (await pathExists(note)) {
+    await fs.unlink(note);
+  }
+  if (await pathExists(folder)) {
+    await fs.rm(folder, { recursive: true, force: true });
+  }
+  await rebuildCourseMap();
+  return {
+    slug: lecture.slug,
+    subject: lecture.subject,
+    module: lecture.module,
+  };
+}
+
 export async function renameLecture(slug: string, titleRaw: string) {
   await ensureWorkspace();
   await readLecture(slug);

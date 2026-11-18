@@ -54,6 +54,7 @@ export async function MarkdownView({
         "[&_tr:nth-child(even)]:bg-muted/25",
         "[&_.katex]:text-[1.05em] [&_.katex]:text-foreground",
         "[&_.katex-display]:my-4 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:py-1",
+        "[&_li_.katex-display]:my-2 [&_li_.katex-display]:overflow-visible",
         "[&_ins]:underline",
         "[&_.fenced-div]:my-3",
         className,
