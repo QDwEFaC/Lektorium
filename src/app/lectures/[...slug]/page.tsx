@@ -8,8 +8,8 @@ import { LectureOutline } from "@/components/lecture-outline";
 import { MarkdownView } from "@/components/markdown-view";
 import { DeleteLectureDialog } from "@/components/delete-lecture-dialog";
 import { DeleteSubjectDialog } from "@/components/delete-subject-dialog";
+import { LinkedAssignments } from "@/components/linked-assignments";
 import { RenameDialog } from "@/components/rename-dialog";
-import { StatusBadge } from "@/components/status-badge";
 import { SubjectTree } from "@/components/subject-tree";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,13 +19,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { assignmentHref, lectureHref } from "@/lib/links";
+import { assignmentsForTarget } from "@/lib/assignment-target";
+import { lectureHref } from "@/lib/links";
 import { lectureOutline, subjectOutline } from "@/lib/outline";
 import { cn } from "@/lib/utils";
 import {
   getLectureOrNull,
   listAssignments,
-  listLectures,
   listTaxonomy,
 } from "@/lib/vault";
 
@@ -42,8 +42,7 @@ export default async function LectureCatchAllPage({
 }) {
   const { slug: rawParts } = await params;
   const parts = decodeParts(rawParts);
-  const [lectures, assignments, tree] = await Promise.all([
-    listLectures(),
+  const [assignments, tree] = await Promise.all([
     listAssignments(),
     listTaxonomy(),
   ]);
@@ -80,8 +79,27 @@ export default async function LectureCatchAllPage({
               lectureCount={subjectLectures.length}
             />
             <CreateTaxonomyDialog kind="module" subject={subject.subject} />
+            <AssignmentDialog
+              tree={tree}
+              defaultTargetSlug={subject.subject}
+              triggerLabel="Задание к предмету"
+            />
           </div>
         </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Задания предмета</CardTitle>
+            <CardDescription>
+              Практика, привязанная ко всему предмету, не к отдельной лекции.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <LinkedAssignments
+              assignments={assignmentsForTarget(assignments, subject.subject)}
+              emptyDescription="Создай задание к предмету — ссылка появится здесь и в графе Obsidian."
+            />
+          </CardContent>
+        </Card>
         {subject.modules.length === 0 ? (
           <EmptyState
             title="Модулей нет"
@@ -159,8 +177,30 @@ export default async function LectureCatchAllPage({
               defaultModule={mod.module}
               defaultMode="manual"
             />
+            <AssignmentDialog
+              tree={tree}
+              defaultTargetSlug={`${subject.subject}/${mod.module}`}
+              triggerLabel="Задание к модулю"
+            />
           </div>
         </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Задания модуля</CardTitle>
+            <CardDescription>
+              Практика на весь модуль, без привязки к одной лекции.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <LinkedAssignments
+              assignments={assignmentsForTarget(
+                assignments,
+                `${subject.subject}/${mod.module}`,
+              )}
+              emptyDescription="Создай задание к модулю — ссылка появится в заметке модуля."
+            />
+          </CardContent>
+        </Card>
         {mod.lectures.length === 0 ? (
           <EmptyState
             title="Лекций нет"
@@ -185,9 +225,7 @@ export default async function LectureCatchAllPage({
   const lecture = await getLectureOrNull(slug);
   if (!lecture) notFound();
 
-  const linked = assignments.filter((item) =>
-    lecture.assignmentSlugs.includes(item.slug),
-  );
+  const linked = assignmentsForTarget(assignments, lecture.slug);
   const outline = lectureOutline(lecture.body);
   const hasOutline = outline.length > 0;
 
@@ -239,11 +277,11 @@ export default async function LectureCatchAllPage({
             title={lecture.title}
             subject={lecture.subject}
             module={lecture.module}
-            assignmentCount={lecture.assignmentSlugs.length}
+            assignmentCount={linked.length}
           />
           <AssignmentDialog
-            lectures={lectures}
-            defaultLectureSlug={lecture.slug}
+            tree={tree}
+            defaultTargetSlug={lecture.slug}
             triggerLabel="Задание к этой лекции"
           />
         </div>
@@ -283,26 +321,11 @@ export default async function LectureCatchAllPage({
               <CardTitle>Задания</CardTitle>
               <CardDescription>Связь лекция → практика.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2">
-              {linked.length === 0 ? (
-                <EmptyState
-                  title="Ещё не привязано"
-                  description="Создай задание — в заметке лекции появится [[вики-ссылка]]."
-                />
-              ) : (
-                linked.map((assignment) => (
-                  <Link
-                    key={assignment.slug}
-                    href={assignmentHref(assignment.slug)}
-                    className="block rounded-lg border px-3 py-2 hover:bg-muted/60"
-                  >
-                    <p className="text-sm font-medium">{assignment.title}</p>
-                    <div className="mt-1">
-                      <StatusBadge status={assignment.status} />
-                    </div>
-                  </Link>
-                ))
-              )}
+            <CardContent>
+              <LinkedAssignments
+                assignments={linked}
+                emptyDescription="Создай задание — в заметке лекции появится [[вики-ссылка]]."
+              />
             </CardContent>
           </Card>
           <Button variant="outline" render={<Link href="/lectures" />}>

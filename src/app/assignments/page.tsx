@@ -9,16 +9,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { describeAssignmentTarget } from "@/lib/assignment-target";
 import { assignmentHref } from "@/lib/links";
 import { CODE_LANGUAGE_LABEL } from "@/lib/types";
-import { listAssignments, listLectures } from "@/lib/vault";
+import { listAssignments, listLectures, listTaxonomy } from "@/lib/vault";
 
 export const dynamic = "force-dynamic";
 
 export default async function AssignmentsPage() {
-  const [assignments, lectures] = await Promise.all([
+  const [assignments, lectures, tree] = await Promise.all([
     listAssignments(),
     listLectures(),
+    listTaxonomy(),
   ]);
 
   return (
@@ -29,46 +31,42 @@ export default async function AssignmentsPage() {
             Задания
           </h1>
           <p className="text-sm text-muted-foreground">
-            Каждое задание ссылается на лекцию и на папку в{" "}
+            Привязка к предмету, модулю или лекции и папка в{" "}
             <code className="rounded bg-muted px-1">code/</code>.
           </p>
         </div>
-        <AssignmentDialog lectures={lectures} />
+        <AssignmentDialog tree={tree} />
       </div>
 
       {assignments.length === 0 ? (
         <EmptyState
           title="Заданий нет"
-          description="Привяжи практику к лекции — появятся wiki-ссылки в Obsidian и заготовка кода для Zed."
-          action={<AssignmentDialog lectures={lectures} />}
+          description="Привяжи практику к предмету, модулю или лекции — появятся wiki-ссылки в Obsidian и заготовка кода для Zed."
+          action={<AssignmentDialog tree={tree} />}
         />
       ) : (
         <div className="grid gap-3">
           {assignments.map((assignment) => {
-            const lecture = lectures.find(
-              (item) => item.slug === assignment.lectureSlug,
+            const target = describeAssignmentTarget(
+              assignment.lectureSlug,
+              lectures,
+              tree,
             );
             return (
-            <Link key={assignment.slug} href={assignmentHref(assignment.slug)}>
-              <Card className="hover:bg-muted/40">
-                <CardHeader className="flex-row items-start justify-between gap-3">
-                  <div>
-                    <CardTitle>{assignment.title}</CardTitle>
-                    <CardDescription>
-                      {lecture
-                        ? `${lecture.subject} · ${lecture.module} · ${lecture.title}`
-                        : assignment.lectureSlug
-                          ? assignment.lectureSlug
-                          : "Без лекции"}
-                    </CardDescription>
-                  </div>
-                  <StatusBadge status={assignment.status} />
-                </CardHeader>
-                <CardContent className="text-xs text-muted-foreground">
-                  {assignment.codePath} · {CODE_LANGUAGE_LABEL[assignment.language]}
-                </CardContent>
-              </Card>
-            </Link>
+              <Link key={assignment.slug} href={assignmentHref(assignment.slug)}>
+                <Card className="hover:bg-muted/40">
+                  <CardHeader className="flex-row items-start justify-between gap-3">
+                    <div>
+                      <CardTitle>{assignment.title}</CardTitle>
+                      <CardDescription>{target.text}</CardDescription>
+                    </div>
+                    <StatusBadge status={assignment.status} />
+                  </CardHeader>
+                  <CardContent className="text-xs text-muted-foreground">
+                    {assignment.codePath} · {CODE_LANGUAGE_LABEL[assignment.language]}
+                  </CardContent>
+                </Card>
+              </Link>
             );
           })}
         </div>

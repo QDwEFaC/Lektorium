@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ListChecks, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -18,27 +18,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { assignmentHref } from "@/lib/links";
-import { groupLectures } from "@/lib/taxonomy";
+import type { SubjectGroup } from "@/lib/taxonomy";
 import {
   CODE_LANGUAGES,
   CODE_LANGUAGE_LABEL,
   type CodeLanguage,
+  type Lecture,
 } from "@/lib/types";
 
 export function AssignmentDialog({
-  lectures,
-  defaultLectureSlug,
+  tree,
+  defaultTargetSlug,
   triggerLabel = "Новое задание",
 }: {
-  lectures: { slug: string; title: string; subject: string; module: string }[];
-  defaultLectureSlug?: string;
+  tree: SubjectGroup<Lecture>[];
+  defaultTargetSlug?: string;
   triggerLabel?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [lectureSlug, setLectureSlug] = useState(defaultLectureSlug ?? "");
+  const [targetSlug, setTargetSlug] = useState(defaultTargetSlug ?? "");
   const [language, setLanguage] = useState<CodeLanguage>("python");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +47,7 @@ export function AssignmentDialog({
   function reset() {
     setTitle("");
     setPrompt("");
-    setLectureSlug(defaultLectureSlug ?? "");
+    setTargetSlug(defaultTargetSlug ?? "");
     setLanguage("python");
     setError(null);
   }
@@ -61,7 +62,7 @@ export function AssignmentDialog({
         body: JSON.stringify({
           title,
           prompt,
-          lectureSlug: lectureSlug || undefined,
+          lectureSlug: targetSlug || undefined,
           language,
         }),
       });
@@ -72,7 +73,7 @@ export function AssignmentDialog({
       if (!response.ok) {
         throw new Error(data.error || "Не удалось создать задание");
       }
-      toast.success("Задание связано с лекцией и папкой кода");
+      toast.success("Задание создано");
       setOpen(false);
       reset();
       router.refresh();
@@ -103,7 +104,7 @@ export function AssignmentDialog({
           <DialogTitle>Задание</DialogTitle>
           <DialogDescription>
             Создастся заметка в Obsidian и папка в <code>code/</code> для Zed.
-            Wiki-ссылка на лекцию проставится сама.
+            Можно привязать к предмету, модулю или лекции.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -117,28 +118,36 @@ export function AssignmentDialog({
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="assignment-lecture">Лекция</Label>
+            <Label htmlFor="assignment-target">Привязка</Label>
             <select
-              id="assignment-lecture"
-              value={lectureSlug}
-              onChange={(event) => setLectureSlug(event.target.value)}
+              id="assignment-target"
+              value={targetSlug}
+              onChange={(event) => setTargetSlug(event.target.value)}
               className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
             >
-              <option value="">Без лекции</option>
-              {groupLectures(lectures).map((subject) =>
-                subject.modules.map((mod) => (
-                  <optgroup
-                    key={`${subject.subject}/${mod.module}`}
-                    label={`${subject.subject} · ${mod.module}`}
-                  >
-                    {mod.lectures.map((lecture) => (
-                      <option key={lecture.slug} value={lecture.slug}>
-                        {lecture.title}
-                      </option>
-                    ))}
+              <option value="">Без привязки</option>
+              {tree.map((subject) => (
+                <Fragment key={subject.subject}>
+                  <optgroup label={subject.subject}>
+                    <option value={subject.subject}>Предмет целиком</option>
                   </optgroup>
-                )),
-              )}
+                  {subject.modules.map((mod) => (
+                    <optgroup
+                      key={`${subject.subject}/${mod.module}`}
+                      label={`${subject.subject} · ${mod.module}`}
+                    >
+                      <option value={`${subject.subject}/${mod.module}`}>
+                        Модуль целиком
+                      </option>
+                      {mod.lectures.map((lecture) => (
+                        <option key={lecture.slug} value={lecture.slug}>
+                          {lecture.title}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </Fragment>
+              ))}
             </select>
           </div>
           <div className="space-y-1.5">

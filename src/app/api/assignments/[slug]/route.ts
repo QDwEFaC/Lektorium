@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { updateAssignmentStatus } from "@/lib/vault";
-import type { AssignmentStatus } from "@/lib/types";
-
-const STATUSES: AssignmentStatus[] = ["todo", "in-progress", "done"];
+import { isAssignmentStatus } from "@/lib/types";
 
 export async function PATCH(
   request: Request,
@@ -11,12 +9,12 @@ export async function PATCH(
   try {
     const { slug } = await context.params;
     const body = (await request.json()) as { status?: string };
-    if (!STATUSES.includes(body.status as AssignmentStatus)) {
+    if (!body.status || !isAssignmentStatus(body.status)) {
       return NextResponse.json({ error: "Неизвестный статус" }, { status: 400 });
     }
     const assignment = await updateAssignmentStatus(
       decodeURIComponent(slug),
-      body.status as AssignmentStatus,
+      body.status,
     );
     return NextResponse.json(assignment);
   } catch (error) {

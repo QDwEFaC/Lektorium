@@ -4,9 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { STATUS_LABEL, type AssignmentStatus } from "@/lib/types";
-
-const ORDER: AssignmentStatus[] = ["todo", "in-progress", "done"];
+import {
+  ASSIGNMENT_STATUSES,
+  STATUS_LABEL,
+  type AssignmentStatus,
+} from "@/lib/types";
 
 export function StatusActions({
   slug,
@@ -44,7 +46,7 @@ export function StatusActions({
 
   return (
     <div className="flex flex-wrap gap-2">
-      {ORDER.map((item) => (
+      {ASSIGNMENT_STATUSES.map((item) => (
         <Button
           key={item}
           size="sm"

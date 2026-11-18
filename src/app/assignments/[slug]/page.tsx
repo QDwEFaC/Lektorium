@@ -11,9 +11,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { lectureHref } from "@/lib/links";
-import { CODE_LANGUAGE_LABEL } from "@/lib/types";
-import { getAssignmentOrNull, getLectureOrNull } from "@/lib/vault";
+import { describeAssignmentTarget } from "@/lib/assignment-target";
+import { CODE_LANGUAGE_LABEL, TARGET_KIND_LABEL } from "@/lib/types";
+import {
+  getAssignmentOrNull,
+  listLectures,
+  listTaxonomy,
+} from "@/lib/vault";
 
 export const dynamic = "force-dynamic";
 
@@ -24,12 +28,18 @@ export default async function AssignmentDetailPage({
 }) {
   const { slug: raw } = await params;
   const slug = decodeURIComponent(raw);
-  const assignment = await getAssignmentOrNull(slug);
+  const [assignment, lectures, tree] = await Promise.all([
+    getAssignmentOrNull(slug),
+    listLectures(),
+    listTaxonomy(),
+  ]);
   if (!assignment) notFound();
 
-  const lecture = assignment.lectureSlug
-    ? await getLectureOrNull(assignment.lectureSlug)
-    : null;
+  const target = describeAssignmentTarget(
+    assignment.lectureSlug,
+    lectures,
+    tree,
+  );
 
   return (
     <div className="space-y-6">
@@ -60,20 +70,22 @@ export default async function AssignmentDetailPage({
         <aside className="space-y-3">
           <Card>
             <CardHeader>
-              <CardTitle>Лекция</CardTitle>
+              <CardTitle>Привязка</CardTitle>
             </CardHeader>
             <CardContent>
-              {lecture ? (
+              {target.href ? (
                 <div className="space-y-2">
                   <p className="text-xs text-muted-foreground">
-                    {lecture.subject} · {lecture.module}
+                    {target.kind
+                      ? TARGET_KIND_LABEL[target.kind]
+                      : "Заметка"}
                   </p>
                   <Button
                     variant="outline"
                     className="h-auto w-full justify-start whitespace-normal py-2"
-                    render={<Link href={lectureHref(lecture.slug)} />}
+                    render={<Link href={target.href} />}
                   >
-                    {lecture.title}
+                    {target.short}
                   </Button>
                 </div>
               ) : (

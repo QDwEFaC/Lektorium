@@ -13,8 +13,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { describeAssignmentTarget } from "@/lib/assignment-target";
 import { assignmentHref } from "@/lib/links";
-import { STATUS_LABEL } from "@/lib/types";
+import { ASSIGNMENT_STATUSES, STATUS_LABEL } from "@/lib/types";
 import { getOverview, listTaxonomy } from "@/lib/vault";
 
 export const dynamic = "force-dynamic";
@@ -39,13 +40,14 @@ export default async function HomePage() {
           Лекция из интернета становится заметкой, заданием и папкой кода.
         </h1>
         <p className="max-w-2xl text-muted-foreground">
-          Сохрани URL в markdown для Obsidian: предмет → модуль → лекция. К
-          уроку привяжи задание — появятся wiki-ссылки и каталог для Zed.
+          Сохрани URL в markdown для Obsidian: предмет → модуль → лекция.
+          Задание можно привязать к любому из этих уровней — появятся
+          wiki-ссылки и каталог для Zed.
         </p>
         <div className="flex flex-wrap gap-2">
           <CaptureDialog />
           <CreateTaxonomyDialog kind="subject" />
-          <AssignmentDialog lectures={lectures} />
+          <AssignmentDialog tree={tree} />
         </div>
       </header>
 
@@ -96,7 +98,7 @@ export default async function HomePage() {
           <CardHeader>
             <CardTitle>Что делать дальше</CardTitle>
             <CardDescription>
-              Открытые задания, привязанные к лекциям.
+              Открытые задания — к предмету, модулю или лекции.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -104,7 +106,7 @@ export default async function HomePage() {
               <EmptyState
                 title="Нет открытых заданий"
                 description="Сохрани лекцию из URL, затем создай к ней практику — появится заметка и папка кода."
-                action={<AssignmentDialog lectures={lectures} triggerLabel="Создать задание" />}
+                action={<AssignmentDialog tree={tree} triggerLabel="Создать задание" />}
               />
             ) : (
               openAssignments.map((assignment) => (
@@ -116,10 +118,13 @@ export default async function HomePage() {
                   <div className="min-w-0">
                     <p className="font-medium">{assignment.title}</p>
                     <p className="text-xs text-muted-foreground">
-                      {assignment.lectureSlug
-                        ? lectures.find((item) => item.slug === assignment.lectureSlug)
-                          ?.title ?? assignment.lectureSlug
-                        : "Без лекции"}{" "}
+                      {
+                        describeAssignmentTarget(
+                          assignment.lectureSlug,
+                          lectures,
+                          tree,
+                        ).text
+                      }{" "}
                       · {assignment.codePath}
                     </p>
                   </div>
@@ -153,8 +158,9 @@ export default async function HomePage() {
       </section>
 
       <p className="text-xs text-muted-foreground">
-        Статусы заданий: {STATUS_LABEL.todo}, {STATUS_LABEL["in-progress"]},{" "}
-        {STATUS_LABEL.done}. Папок кода: {codeProjects.length}.{" "}
+        Статусы заданий:{" "}
+        {ASSIGNMENT_STATUSES.map((item) => STATUS_LABEL[item]).join(", ")}.
+        Папок кода: {codeProjects.length}.{" "}
         <Link href="/code" className="underline-offset-4 hover:underline">
           <Code2 className="mr-1 inline size-3.5" />
           Смотреть код

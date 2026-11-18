@@ -1,4 +1,14 @@
-export type AssignmentStatus = "todo" | "in-progress" | "done";
+export const ASSIGNMENT_STATUSES = [
+  "todo",
+  "in-progress",
+  "review",
+  "done",
+] as const;
+export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number];
+
+export function isAssignmentStatus(value: string): value is AssignmentStatus {
+  return (ASSIGNMENT_STATUSES as readonly string[]).includes(value);
+}
 export const CODE_LANGUAGES = [
   "python",
   "typescript",
@@ -61,5 +71,21 @@ export type Overview = {
 export const STATUS_LABEL: Record<AssignmentStatus, string> = {
   todo: "Не начато",
   "in-progress": "В работе",
+  review: "На проверке",
   done: "Сдано",
 };
+
+export const STATUS_NOTE_LABEL: Record<AssignmentStatus, string> = {
+  todo: "не начато",
+  "in-progress": "в работе",
+  review: "на проверке",
+  done: "сдано",
+};
+
+export const TARGET_KIND_LABEL = {
+  subject: "Предмет",
+  module: "Модуль",
+  lecture: "Лекция",
+} as const;
+
+export type AssignmentTargetKind = keyof typeof TARGET_KIND_LABEL;

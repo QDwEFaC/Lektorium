@@ -80,7 +80,7 @@ export async function MarkdownView({
           ),
         }}
       >
-        {wikiToMarkdown(withMath, { lectureSlug })}
+        {wikiToMarkdown(withMath.replace(/<br\s*\/?>/gi, " "), { lectureSlug })}
       </Markdown>
     </div>
   );

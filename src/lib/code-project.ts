@@ -86,6 +86,7 @@ export async function createCodeProject(input: {
   folder: string;
   assignment: Assignment;
   lecture?: Lecture;
+  targetSlug?: string;
 }) {
   const dir = path.join(CODE_DIR, input.folder);
   await fs.mkdir(dir, { recursive: true });
@@ -95,9 +96,11 @@ export async function createCodeProject(input: {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, starter.contents, "utf8");
 
-  const lectureLine = input.lecture
-    ? `- Лекция: \`vault/Лекции/${input.lecture.slug}.md\``
-    : "- Лекция: не привязана";
+  const attached =
+    input.lecture?.slug ?? input.targetSlug ?? input.assignment.lectureSlug;
+  const lectureLine = attached
+    ? `- Привязка: \`vault/Лекции/${attached}.md\``
+    : "- Привязка: нет";
 
   const prompt =
     input.assignment.body
@@ -129,7 +132,7 @@ ${prompt}
 ---
 
 - Заметка: \`vault/Задания/${input.assignment.slug}.md\`
-${input.lecture ? `- Лекция: \`vault/Лекции/${input.lecture.slug}.md\`` : ""}
+${attached ? `- Привязка: \`vault/Лекции/${attached}.md\`` : ""}
 `;
   await fs.writeFile(path.join(dir, "ЗАДАНИЕ.md"), taskNote, "utf8");
 

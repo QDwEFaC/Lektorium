@@ -11,14 +11,14 @@ import {
 } from "@/components/ui/card";
 import { assignmentHref } from "@/lib/links";
 import { CODE_LANGUAGE_LABEL } from "@/lib/types";
-import { listCodeProjects, listLectures } from "@/lib/vault";
+import { listCodeProjects, listTaxonomy } from "@/lib/vault";
 
 export const dynamic = "force-dynamic";
 
 export default async function CodePage() {
-  const [projects, lectures] = await Promise.all([
+  const [projects, tree] = await Promise.all([
     listCodeProjects(),
-    listLectures(),
+    listTaxonomy(),
   ]);
 
   return (
@@ -33,14 +33,14 @@ export default async function CodePage() {
             README и ЗАДАНИЕ.md со ссылками на заметки.
           </p>
         </div>
-        <AssignmentDialog lectures={lectures} triggerLabel="Новое задание с кодом" />
+        <AssignmentDialog tree={tree} triggerLabel="Новое задание с кодом" />
       </div>
 
       {projects.length === 0 ? (
         <EmptyState
           title="Папок кода нет"
           description="Создай задание — Лекторий заведёт каталог с заготовкой файла."
-          action={<AssignmentDialog lectures={lectures} />}
+          action={<AssignmentDialog tree={tree} />}
         />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">

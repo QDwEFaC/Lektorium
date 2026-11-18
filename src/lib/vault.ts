@@ -39,9 +39,12 @@ import {
   type SubjectGroup,
 } from "@/lib/taxonomy";
 import {
+  isAssignmentStatus,
   isCodeLanguage,
+  STATUS_NOTE_LABEL,
   type Assignment,
   type AssignmentStatus,
+  type AssignmentTargetKind,
   type CodeLanguage,
   type Lecture,
   type Overview,
@@ -166,12 +169,12 @@ export async function readAssignment(slug: string): Promise<Assignment> {
   const raw = await fs.readFile(assignmentPath(slug), "utf8");
   const parsed = matter(raw);
   const data = parsed.data as Record<string, unknown>;
-  const status = String(data.status ?? "todo") as AssignmentStatus;
+  const status = String(data.status ?? "todo");
   const language = String(data.language ?? "python");
   return {
     slug,
     title: String(data.title ?? slug),
-    status: ["todo", "in-progress", "done"].includes(status) ? status : "todo",
+    status: isAssignmentStatus(status) ? status : "todo",
     lectureSlug: data.lecture ? String(data.lecture) : undefined,
     codePath: String(data.code_path ?? ""),
     language: isCodeLanguage(language) ? language : "python",
@@ -259,18 +262,43 @@ async function writeNote(
   await fs.writeFile(file, serialized, "utf8");
 }
 
-function subjectIndexBody(subject: string, modules: string[]) {
+function assignmentWikiLines(assignments: Assignment[]) {
+  if (assignments.length === 0) {
+    return "_К этому уровню задания не привязаны._";
+  }
+  return assignments
+    .map((item) => `- ${wikiAssignment(item.slug)}`)
+    .join("\n");
+}
+
+function subjectIndexBody(
+  subject: string,
+  modules: string[],
+  assignments: Assignment[],
+) {
   const lines =
     modules.length === 0
       ? "_Модулей пока нет._"
       : modules.map((name) => `- ${wikiLecture(`${subject}/${name}`)}`).join("\n");
-  return [`# ${subject}`, "", "## Модули", "", lines, ""].join("\n");
+  return [
+    `# ${subject}`,
+    "",
+    "## Модули",
+    "",
+    lines,
+    "",
+    "## Задания",
+    "",
+    assignmentWikiLines(assignments),
+    "",
+  ].join("\n");
 }
 
 function moduleIndexBody(
   subject: string,
   moduleName: string,
   lectures: Lecture[],
+  assignments: Assignment[],
 ) {
   const lines =
     lectures.length === 0
@@ -290,28 +318,53 @@ function moduleIndexBody(
     "",
     lines,
     "",
+    "## Задания",
+    "",
+    assignmentWikiLines(assignments),
+    "",
   ].join("\n");
 }
 
-async function rewriteTaxonomyNotes(tree: SubjectGroup<Lecture>[]) {
+async function rewriteTaxonomyNotes(
+  tree: SubjectGroup<Lecture>[],
+  assignments: Assignment[],
+) {
   for (const subject of tree) {
+    const subjectAssignments = assignments.filter(
+      (item) => item.lectureSlug === subject.subject,
+    );
     await writeNote(
       path.join(LECTURES_DIR, `${subject.subject}.md`),
-      { type: "subject", title: subject.subject },
+      {
+        type: "subject",
+        title: subject.subject,
+        assignments: subjectAssignments.map((item) => item.slug),
+      },
       subjectIndexBody(
         subject.subject,
         subject.modules.map((item) => item.module),
+        subjectAssignments,
       ),
     );
     for (const mod of subject.modules) {
+      const moduleSlug = `${subject.subject}/${mod.module}`;
+      const moduleAssignments = assignments.filter(
+        (item) => item.lectureSlug === moduleSlug,
+      );
       await writeNote(
         path.join(LECTURES_DIR, subject.subject, `${mod.module}.md`),
         {
           type: "module",
           title: mod.module,
           subject: subject.subject,
+          assignments: moduleAssignments.map((item) => item.slug),
         },
-        moduleIndexBody(subject.subject, mod.module, mod.lectures),
+        moduleIndexBody(
+          subject.subject,
+          mod.module,
+          mod.lectures,
+          moduleAssignments,
+        ),
       );
     }
   }
@@ -396,7 +449,7 @@ export async function listTaxonomy(): Promise<SubjectGroup<Lecture>[]> {
 export async function rebuildCourseMap() {
   const { assignments } = await getOverview();
   const tree = await listTaxonomy();
-  await rewriteTaxonomyNotes(tree);
+  await rewriteTaxonomyNotes(tree, assignments);
   const subjectSections =
     tree.length === 0
       ? "_Предметов пока нет._"
@@ -430,13 +483,8 @@ export async function rebuildCourseMap() {
           .map((assignment) => {
             const lecture = assignment.lectureSlug
               ? wikiLecture(assignment.lectureSlug)
-              : "без лекции";
-            const status =
-              assignment.status === "done"
-                ? "сдано"
-                : assignment.status === "in-progress"
-                  ? "в работе"
-                  : "не начато";
+              : "без привязки";
+            const status = STATUS_NOTE_LABEL[assignment.status];
             return `- ${wikiAssignment(assignment.slug)} — ${status} · ${lecture} · \`${assignment.codePath}\``;
           })
           .join("\n");
@@ -591,6 +639,16 @@ export async function relocalizeLectureImages(slug: string) {
   return { slug, images: copied.length };
 }
 
+function replaceTargetSection(body: string, content: string) {
+  if (body.includes("## Привязка")) {
+    return replaceSection(body, "Привязка", content);
+  }
+  if (body.includes("## Лекция")) {
+    return replaceSection(body, "Лекция", content);
+  }
+  return replaceSection(body, "Привязка", content);
+}
+
 async function unlinkAssignmentLecture(assignment: Assignment) {
   const raw = await fs.readFile(assignmentPath(assignment.slug), "utf8");
   const parsed = matter(raw);
@@ -600,12 +658,32 @@ async function unlinkAssignmentLecture(assignment: Assignment) {
       ...parsed.data,
       lecture: "",
     },
-    replaceSection(
-      parsed.content,
-      "Лекция",
-      "_Задание пока не привязано к лекции._",
-    ),
+    replaceTargetSection(parsed.content, "_Задание пока не привязано._"),
   );
+}
+
+async function resolveAssignmentTarget(slug: string): Promise<{
+  slug: string;
+  kind: AssignmentTargetKind;
+  lecture?: Lecture;
+}> {
+  assertSafeRelPath(slug);
+  const raw = await fs.readFile(lecturePath(slug), "utf8");
+  const parsed = matter(raw);
+  const type = String(parsed.data.type ?? "");
+  if (type === "lecture") {
+    return { slug, kind: "lecture", lecture: await readLecture(slug) };
+  }
+  if (type === "module" || type === "subject") {
+    return { slug, kind: type };
+  }
+  const parts = slug.split("/");
+  if (parts.length >= 3) {
+    return { slug, kind: "lecture", lecture: await readLecture(slug) };
+  }
+  if (parts.length === 2) return { slug, kind: "module" };
+  if (parts.length === 1) return { slug, kind: "subject" };
+  throw new Error("Некуда привязать задание");
 }
 
 async function rewriteLectureAssignments(
@@ -635,15 +713,15 @@ function assignmentMarkdown(input: {
   lectureSlug?: string;
   codePath: string;
 }) {
-  const lectureBlock = input.lectureSlug
+  const targetBlock = input.lectureSlug
     ? wikiLecture(input.lectureSlug)
-    : "_Задание пока не привязано к лекции._";
+    : "_Задание пока не привязано._";
   return [
     `# ${input.title}`,
     "",
-    "## Лекция",
+    "## Привязка",
     "",
-    lectureBlock,
+    targetBlock,
     "",
     "## Условие",
     "",
@@ -669,9 +747,17 @@ export async function createAssignment(input: {
   language: CodeLanguage;
 }) {
   await ensureWorkspace();
-  const lecture = input.lectureSlug
-    ? await readLecture(input.lectureSlug)
-    : undefined;
+  let target:
+    | { slug: string; kind: AssignmentTargetKind; lecture?: Lecture }
+    | undefined;
+  if (input.lectureSlug) {
+    try {
+      target = await resolveAssignmentTarget(input.lectureSlug);
+    } catch {
+      throw new Error("Предмет, модуль или лекция не найдены");
+    }
+  }
+  const lecture = target?.lecture;
   const existing = await listMarkdown(ASSIGNMENTS_DIR);
   const index = nextIndex(existing);
   const slug = numberedTitle(index, input.title);
@@ -681,7 +767,7 @@ export async function createAssignment(input: {
   const body = assignmentMarkdown({
     title: input.title.trim(),
     prompt: input.prompt,
-    lectureSlug: input.lectureSlug,
+    lectureSlug: target?.slug,
     codePath,
   });
 
@@ -691,7 +777,7 @@ export async function createAssignment(input: {
       type: "assignment",
       title: input.title.trim(),
       status: "todo",
-      lecture: input.lectureSlug ?? "",
+      lecture: target?.slug ?? "",
       code_path: codePath,
       language: input.language,
       created,
@@ -701,7 +787,12 @@ export async function createAssignment(input: {
   );
 
   const assignment = await readAssignment(slug);
-  await createCodeProject({ folder, assignment, lecture });
+  await createCodeProject({
+    folder,
+    assignment,
+    lecture,
+    targetSlug: target?.slug,
+  });
 
   if (lecture) {
     const next = [...new Set([...lecture.assignmentSlugs, slug])];
@@ -718,13 +809,11 @@ export async function updateAssignmentStatus(
 ) {
   const raw = await fs.readFile(assignmentPath(slug), "utf8");
   const parsed = matter(raw);
-  const statusLabel =
-    status === "done"
-      ? "сдано"
-      : status === "in-progress"
-        ? "в работе"
-        : "не начато";
-  const body = replaceSection(parsed.content, "Статус", statusLabel);
+  const body = replaceSection(
+    parsed.content,
+    "Статус",
+    STATUS_NOTE_LABEL[status],
+  );
   await writeNote(
     assignmentPath(slug),
     {
@@ -882,8 +971,8 @@ export async function createSubject(title: string) {
   }
   await writeNote(
     note,
-    { type: "subject", title: name },
-    subjectIndexBody(name, []),
+    { type: "subject", title: name, assignments: [] },
+    subjectIndexBody(name, [], []),
   );
   await ensureDir(dir);
   await rebuildCourseMap();
@@ -906,8 +995,8 @@ export async function createModule(subjectInput: string, title: string) {
   }
   await writeNote(
     note,
-    { type: "module", title: moduleName, subject },
-    moduleIndexBody(subject, moduleName, []),
+    { type: "module", title: moduleName, subject, assignments: [] },
+    moduleIndexBody(subject, moduleName, [], []),
   );
   await ensureDir(dir);
   await rebuildCourseMap();
